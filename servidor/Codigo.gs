@@ -78,9 +78,10 @@ function instalar() {
   }
 }
 
+// Muestra el mensaje en el registro y como aviso flotante en la hoja (sin bloquear la ejecución)
 function avisar(msg) {
   console.log(msg);
-  try { SpreadsheetApp.getUi().alert(msg); } catch (e) {}
+  try { SpreadsheetApp.getActive().toast(msg, 'Salidas QR', 15); } catch (e) {}
 }
 
 function onOpen() {
