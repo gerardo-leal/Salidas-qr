@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f6b6e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Salidas QR">
+<title>Salidas QR · Leal Leal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Lexend:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#eef2f4; --card:#fff; --fg:#17232b; --muted:#5a6b75; --line:#d3dde2;
+  --accent:#0f6b6e; --accent-soft:#dbefee; --mark:#f2b134; --ok:#2e7d4f; --ok-soft:#dff1e6; --bad:#b3402f; --bad-soft:#f8e1dc;
+  --display:"Bitter",Georgia,serif; --body:"Lexend",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10181c; --card:#18242a; --fg:#e4ecef; --muted:#93a6af; --line:#2a3a42;
+  --accent:#4cc0c2; --accent-soft:#173a3c; --ok:#5cc28a; --ok-soft:#173326; --bad:#e8826f; --bad-soft:#3a1f1a; color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45}
+body{padding:calc(12px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+body.sinbarra{padding-bottom:32px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-family:var(--display);font-size:1.25rem;margin:0;line-height:1.2}
+h2{font-family:var(--display);font-size:1.08rem;margin:0}
+h3{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+p{margin:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.top small{display:block;font-family:var(--body);font-size:.78rem;color:var(--muted);font-weight:400}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.btn{font:inherit;font-size:.95rem;font-weight:500;min-height:44px;padding:10px 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.btn.warn{color:var(--bad);border-color:var(--bad)}
+.btn.full{width:100%}
+.btn.big{min-height:56px;font-size:1.05rem}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:.85rem}
+.btn:disabled{opacity:.55}
+.btn svg{width:24px;height:24px;flex:none}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+input,select{font:inherit;font-size:16px;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);width:100%}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:.88rem;font-weight:500}
+.form{display:flex;flex-direction:column;gap:12px}
+.av{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-weight:600;color:#fff;flex:none;object-fit:cover;background:var(--accent);font-size:.95rem}
+.av.lg{width:84px;height:84px;border-radius:16px;font-size:1.4rem}
+.av.xl{width:120px;height:120px;border-radius:20px;font-size:1.8rem}
+.list{display:flex;flex-direction:column}
+.item{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left;width:100%;cursor:pointer}
+.item:last-child{border-bottom:0}
+.item b{display:block;font-weight:500}
+.item span.s{display:block;font-size:.84rem;color:var(--muted)}
+.chev{color:var(--muted);flex:none}
+.pill{font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:.88rem;letter-spacing:.03em;word-break:break-all}
+.qrwrap{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.qr{background:#fff;padding:12px;border-radius:14px;line-height:0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.75rem;color:var(--muted)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{font:inherit;font-size:.9rem;font-weight:500;min-height:40px;padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--fg);white-space:nowrap;cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.grupos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (min-width:560px){.grupos{grid-template-columns:repeat(6,1fr)}}
+.grupos button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:12px;padding:10px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.grupos b{font-family:var(--display);font-size:1.1rem}
+.grupos span{font-size:.7rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.result{border:2px solid var(--ok)}
+.result.no{border-color:var(--bad)}
+.pick{display:flex;flex-direction:column;gap:10px}
+.pick label{display:flex;gap:12px;align-items:center;border:2px solid var(--line);border-radius:14px;padding:10px;cursor:pointer}
+.pick label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.pick input{width:22px;min-height:22px;height:22px;flex:none;accent-color:var(--accent)}
+.muted{color:var(--muted);font-size:.86rem}
+.confirm{background:var(--bad-soft);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;font-size:.92rem}
+.cargando{text-align:center;color:var(--muted);padding:40px 10px}
+.salida{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--line)}
+.salida:last-child{border-bottom:0}
+.salida .h{font-variant-numeric:tabular-nums;font-weight:600}
+#lector{width:100%;border-radius:14px;overflow:hidden;background:#000}
+#lector video{width:100%!important;border-radius:14px}
+nav.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);z-index:10;
+  padding:4px max(6px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
+nav.bar div{max-width:720px;margin:0 auto;display:flex}
+nav.bar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:.7rem;font-weight:500;background:none;border:0;color:var(--muted);padding:8px 0 6px;cursor:pointer;min-height:56px}
+nav.bar button[aria-current="page"]{color:var(--accent)}
+nav.bar svg{width:24px;height:24px}
+.back{display:flex;align-items:center;gap:6px;font:inherit;font-weight:500;background:none;border:0;color:var(--accent);padding:6px 0;cursor:pointer;min-height:44px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:12px;font-size:.92rem;width:max-content;max-width:calc(100% - 28px);z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.login{max-width:440px;margin:0 auto;width:100%;padding-top:4vh}
+.login h1{font-size:1.45rem;text-wrap:balance}
+.tabs3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);border-radius:12px;padding:4px}
+.tabs3 button{font:inherit;font-size:.85rem;font-weight:500;min-height:40px;border:0;border-radius:9px;background:none;color:var(--muted);cursor:pointer}
+.tabs3 button[aria-selected="true"]{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:.72rem;text-transform:uppercase;color:var(--muted)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="cargando">Cargando…</div></div>
+<nav class="bar" id="bar" hidden><div id="barin"></div></nav>
+<div id="toast" hidden role="status" aria-live="polite"></div>
+
+<script>
+/* ===================== CONFIGURACIÓN ===================== */
+// Pega aquí la URL de tu aplicación web de Apps Script (termina en /exec)
+const API_URL = 'PEGA_AQUI_LA_URL_DE_APPS_SCRIPT';
+const ESCUELA = 'Escuela Primaria Profesor Gerardo Guadalupe Leal Leal';
+/* ========================================================= */
+
+const GRUPOS=['1°A','1°B','2°A','2°B','3°A','3°B','4°A','4°B','5°A','5°B','6°A','6°B'];
+const PARENTESCOS=['Mamá','Papá','Abuela','Abuelo','Tía','Tío','Hermano(a) mayor de edad','Padrastro','Madrastra','Otro'];
+
+/* ---------- Íconos ---------- */
+const svg=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const I={
+  home:svg('<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>'),
+  list:svg('<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'),
+  scan:svg('<path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3"/><path d="M7 12h10"/>'),
+  people:svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14a6 6 0 013.5 6"/>'),
+  more:svg('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'),
+  qr:svg('<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/>'),
+  clock:svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>'),
+  user:svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>'),
+  key:svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>'),
+  chev:'<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>'
+};
+
+/* ---------- Utilidades ---------- */
+const $=id=>document.getElementById(id);
+const val=id=>($(id)?$(id).value:'').trim();
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ini=n=>String(n||'').split(' ').filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
+const av=(n,foto,c='')=>foto?`<img class="av ${c}" src="${foto}" alt="Foto de ${esc(n)}">`:`<div class="av ${c}" aria-hidden="true">${esc(ini(n))}</div>`;
+const guardar=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const leer=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const tok=()=>ses&&ses.token;
+const fechaBonita=f=>{if(!f)return'';const[y,m,d]=f.split('-');const hoy=new Date();const iso=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');return f===iso?'Hoy':`${+d}/${+m}/${y}`};
+function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,4000)}
+const qrUrl=c=>location.origin+location.pathname+'?qr='+encodeURIComponent(c);
+
+async function api(fn,...args){
+  if(!/^https:\/\/script\.google\.com\//.test(API_URL))throw new Error('Falta configurar API_URL en index.html.');
+  let r;
+  try{r=await fetch(API_URL,{method:'POST',body:JSON.stringify({fn,args})})}
+  catch(e){throw new Error('Sin conexión. Revisa tu internet e intenta de nuevo.')}
+  let j;try{j=await r.json()}catch(e){throw new Error('El servidor no respondió bien. Intenta de nuevo.')}
+  if(!j.ok){if(/sesión terminó/.test(j.error)){cerrarSesion(true)}throw new Error(j.error)}
+  return j.data;
+}
+async function hacer(btn,fn){
+  const txt=btn&&btn.innerHTML;if(btn){btn.disabled=true;btn.innerHTML='Un momento…'}
+  try{return await fn()}catch(e){toast(e.message||String(e))}
+  finally{if(btn&&document.body.contains(btn)){btn.disabled=false;btn.innerHTML=txt}}
+}
+function leerFoto(file){return new Promise((ok,mal)=>{const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const k=Math.min(1,400/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',0.82))};img.onerror=()=>mal(new Error('No se pudo leer la foto.'));img.src=r.result};r.onerror=()=>mal(new Error('No se pudo leer la foto.'));r.readAsDataURL(file)})}
+
+/* ---------- Estado ---------- */
+let ses=leer('sesion');
+let tab='', sub=null, D={}, confirmar=null, lector=null;
+let grupoSel=leer('grupoSel')||'1°A';
+let rolLogin=leer('ultimoRol')||'padre';
+const params=new URLSearchParams(location.search);
+let scan={code:(params.get('qr')||'').toUpperCase(),res:null,hecho:null};
+if(scan.code){history.replaceState(null,'',location.pathname);if(!ses)rolLogin='maestro'}
+const app=$('app');
+
+const TABS={
+  padre:[['hijos','Mis hijos',I.qr],['personas','Autorizados',I.people],['historial','Historial',I.clock],['cuenta','Cuenta',I.user]],
+  maestro:[['escanear','Escanear',I.scan],['grupo','Mi grupo',I.list],['permisos','Permisos',I.key],['hoy','Hoy',I.clock]],
+  dir:[['inicio','Inicio',I.home],['alumnos','Alumnos',I.list],['escanear','Escanear',I.scan],['maestros','Maestros',I.people],['mas','Más',I.more]]
+};
+
+function cerrarSesion(silencio){cerrarCamara();scan={code:'',res:null,hecho:null};if(ses)api('salir',ses.token).catch(()=>{});ses=null;guardar('sesion',null);tab='';sub=null;D={};render();if(!silencio)toast('Sesión cerrada.')}
+
+/* ---------- Navegación ---------- */
+async function ir(t){await cerrarCamara();tab=t;sub=null;confirmar=null;render();window.scrollTo(0,0);await cargar()}
+function abrir(s){sub=s;confirmar=null;history.pushState({sub:1},'');render();window.scrollTo(0,0);cargarSub()}
+function cerrarSub(){if(sub){sub=null;confirmar=null;render();cargar()}}
+window.addEventListener('popstate',()=>{if(sub)cerrarSub()});
+function atras(){if(history.state&&history.state.sub)history.back();else cerrarSub()}
+
+async function cargar(){
+  if(!ses)return;
+  try{
+    const r=ses.rol;
+    if(r==='padre')D.padre=await api('datosPadre',tok());
+    if(r==='maestro'&&tab!=='escanear')D.maestro=await api('datosMaestro',tok());
+    if(r==='dir'){
+      if(tab==='inicio')D.resumen=await api('resumenDir',tok());
+      if(tab==='alumnos'&&!D.busqueda)D.lista=await api('listaGrupo',tok(),grupoSel);
+      if(tab==='maestros')D.maestros=await api('listaMaestros',tok());
+    }
+  }catch(e){toast(e.message);return}
+  if(!sub)render();
+}
+async function cargarSub(){
+  try{
+    if(sub.t==='ficha')D.ficha=await api('fichaAlumno',tok(),sub.id);
+    if(sub.t==='maestro'&&!D.maestros)D.maestros=await api('listaMaestros',tok());
+  }catch(e){toast(e.message);return}
+  render();
+}
+
+/* ---------- Render ---------- */
+function render(){
+  const bar=$('bar');
+  if(!ses){bar.hidden=true;document.body.classList.add('sinbarra');app.innerHTML=vLogin();return}
+  if(!tab)tab=scan.code&&ses.rol!=='padre'?'escanear':TABS[ses.rol][0][0];
+  bar.hidden=!!sub;document.body.classList.toggle('sinbarra',!!sub);
+  $('barin').innerHTML=TABS[ses.rol].map(([k,l,ic])=>`<button data-tab="${k}" ${tab===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('');
+  let h='';
+  if(sub){h=`<button class="back" data-a="atras">${I.back} Atrás</button>`+(SUB[sub.t]?SUB[sub.t]():'')}
+  else{
+    h=`<header class="top"><h1>${esc(TABS[ses.rol].find(x=>x[0]===tab)[1])}<small>${esc(ses.nombre)}</small></h1><button class="btn sm" data-a="salir">Salir</button></header>`;
+    h+=(V[ses.rol+'_'+tab]||V['c_'+tab]||(()=>''))();
+  }
+  app.innerHTML=h;
+  app.querySelectorAll('.qr[data-code]').forEach(el=>{try{new QRCode(el,{text:qrUrl(el.dataset.code),width:200,height:200,colorDark:'#17232b',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M})}catch(e){el.textContent=el.dataset.code}});
+  if(tab==='escanear'&&!sub&&scan.code&&!scan.res&&!scan.buscando)buscar(scan.code);
+}
+const cargando='<div class="cargando">Cargando…</div>';
+const listaSalidas=(rows,vacio)=>rows.length?`<div class="list">${rows.map(e=>`<div class="salida"><span><span class="h">${esc(fechaBonita(e.fecha))} · ${esc(e.hora)}</span> · ${esc(e.alumno)} <span class="pill">${esc(e.grupo)}</span></span><span class="muted">Recogió ${esc(e.recogio)} (${esc(e.parentesco)}) · Entregó ${esc(e.entrego)}</span></div>`).join('')}</div>`:`<p class="muted">${vacio}</p>`;
+
+function vLogin(){
+  const campos={
+    padre:`<label class="f" for="lu">CURP de tu hijo(a) mayor<input id="lu" autocomplete="username" autocapitalize="characters" maxlength="18" spellcheck="false"></label><label class="f" for="lp">PIN<input id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6"></label>`,
+    maestro:`<label class="f" for="lu">Usuario<input id="lu" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"></label>`,
+    dir:`<label class="f" for="lu">Usuario<input id="lu" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"></label>`}[rolLogin];
+  return `<div class="login card"><h3>Control de salidas</h3><h1>${esc(ESCUELA)}</h1>
+  ${scan.code?`<span class="pill" style="align-self:flex-start">Código escaneado: entra como maestro</span>`:''}
+  <div class="tabs3" role="tablist">${[['padre','Padres'],['maestro','Maestros'],['dir','Dirección']].map(([k,l])=>`<button role="tab" aria-selected="${rolLogin===k}" data-lr="${k}">${l}</button>`).join('')}</div>
+  <form id="f-login" class="form">${campos}<button class="btn pri big full" type="submit">Entrar</button></form>
+  <p class="muted">¿Olvidaste tu PIN o contraseña? Pídelo en la dirección de la escuela.</p></div>`;
+}
+
+const V={
+/* ===== PADRE ===== */
+padre_hijos(){
+  const d=D.padre;if(!d)return cargando;
+  if(!d.hijos.length)return '<p class="muted">No hay alumnos activos en tu cuenta.</p>';
+  return d.hijos.map(s=>`<section class="card"><div><h2>${esc(s.nombre)}</h2><span class="muted">${esc(s.grupo)} · ${esc(s.maestro)}</span></div>
+    <div class="qrwrap"><div class="qr" data-code="${esc(s.qr)}"></div><span class="code muted">${esc(s.qr)}</span>
+    <p class="muted">Toma captura, imprímelo o pégalo en la credencial. Cualquier persona autorizada puede mostrarlo.</p></div>
+    ${confirmar==='qr'+s.id?`<div class="confirm">El código actual dejará de funcionar y tendrás que usar el nuevo.<div class="row"><button class="btn warn grow" data-a="nuevoqr" data-id="${s.id}">Sí, cambiarlo</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`
+    :`<button class="btn full" data-a="pedir" data-k="qr${s.id}">Cambiar código QR</button>`}</section>`).join('');
+},
+padre_personas(){
+  const d=D.padre;if(!d)return cargando;
+  return `<section class="card"><p class="muted">Pueden recoger a todos tus hijos. El maestro verá su foto al escanear.</p>
+  <div class="list">${d.personas.map(p=>`<div class="item" style="cursor:default">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
+  ${confirmar==='p'+p.id?`<button class="btn warn sm" data-a="quitarp" data-id="${p.id}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="p${p.id}">Quitar</button>`}</div>`).join('')||'<p class="muted">Todavía no hay personas. Agrega al menos una.</p>'}</div></section>
+  ${formPersona()}`;
+},
+padre_historial(){const d=D.padre;if(!d)return cargando;return `<section class="card">${listaSalidas(d.historial,'Todavía no hay salidas registradas.')}</section>`},
+padre_cuenta(){
+  const d=D.padre;if(!d)return cargando;
+  return `<form class="card form" id="f-contacto"><h2>Avisos de salida</h2><p class="muted">Te llega un correo cada vez que alguno de tus hijos sale de la escuela.</p>
+  <label class="f" for="cc">Correo<input id="cc" type="email" inputmode="email" value="${esc(d.correo)}"></label><label class="f" for="ct">Teléfono<input id="ct" type="tel" value="${esc(d.telefono)}"></label>
+  <button class="btn pri full" type="submit">Guardar</button></form>
+  <form class="card form" id="f-pin"><h2>Cambiar PIN</h2><label class="f" for="np">Nuevo PIN (4 a 6 números)<input id="np" type="password" inputmode="numeric" maxlength="6"></label><button class="btn pri full" type="submit">Guardar PIN</button></form>`;
+},
+/* ===== ESCANEAR (maestro y dirección) ===== */
+c_escanear(){
+  let h=`<section class="card"><div id="lector" hidden></div>
+  <button class="btn pri big full" data-a="camara" id="btncam">${I.scan} Abrir cámara</button>
+  <form id="f-scan" class="row"><input id="qrin" class="grow" placeholder="O escribe el código: QR-…" autocapitalize="characters" spellcheck="false" aria-label="Código QR"><button class="btn" type="submit">Buscar</button></form></section>`;
+  if(scan.hecho)h+=`<section class="card result"><h2>Salida registrada ${esc(scan.hecho.hora)}</h2><p>${esc(scan.hecho.alumno)} con ${esc(scan.hecho.persona)}. Correo al tutor: ${esc(scan.hecho.correo)}.</p><button class="btn pri big full" data-a="siguiente">${I.scan} Escanear siguiente</button></section>`;
+  const r=scan.res;
+  if(!r)return h+(scan.code&&!scan.hecho?cargando:'');
+  if(!r.valido)return h+`<section class="card result no"><h2>Código no válido</h2><p class="muted">Puede ser un QR que el padre ya cambió. Pide identificación y avisa a la dirección.</p></section>`;
+  const a=r.alumno,ok=r.permiso!=='no';
+  h+=`<section class="card result ${ok?'':'no'}"><div class="row">${av(a.nombre,a.foto,'lg')}<div class="grow"><h2>${esc(a.nombre)}</h2><span class="muted">${esc(a.grupo)} · ${esc(a.titular)}</span></div></div>
+  <span class="pill ${ok?'ok':'bad'}" style="align-self:flex-start">${{propio:'Tu grupo',autorizado:'Tienes permiso hoy',dir:'Dirección',no:'Sin permiso'}[r.permiso]}</span>`;
+  if(r.salida)h+=`<p><b>Ya salió hoy</b> a las ${esc(r.salida.hora)} con ${esc(r.salida.recogio)}.</p>`;
+  else if(!ok)h+=`<p>Este alumno es de ${esc(a.grupo)}. Pide a ${esc(a.titular)} que te dé permiso en su sección Permisos.</p>`;
+  else if(!r.personas.length)h+=`<p>Esta familia no tiene personas autorizadas registradas. Comunícate con la dirección.</p>`;
+  else h+=`<h3>¿Quién lo recoge?</h3><div class="pick">${r.personas.map((p,i)=>`<label for="pk${i}"><input type="radio" name="pk" id="pk${i}" value="${p.id}" data-n="${esc(p.nombre)}">${av(p.nombre,p.foto,'xl')}<span class="grow"><b>${esc(p.nombre)}</b><br><span class="muted">${esc(p.parentesco)}</span></span></label>`).join('')}</div>
+    <button class="btn pri big full" data-a="salida" data-id="${a.id}" data-n="${esc(a.nombre)}">Registrar salida</button>`;
+  return h+'</section>';
+},
+/* ===== MAESTRO ===== */
+maestro_grupo(){
+  const d=D.maestro;if(!d)return cargando;
+  const fuera=d.grupo.filter(s=>s.salio).length;
+  return `<div class="stats" style="grid-template-columns:repeat(2,1fr)"><div class="stat"><b>${d.grupo.length-fuera}</b><span>En la escuela</span></div><div class="stat"><b>${fuera}</b><span>Ya salieron</span></div></div>
+  <section class="card"><h2>${esc(d.yo.grupo)}</h2><div class="list">${d.grupo.map(s=>`<div class="item" style="cursor:default"><div class="grow"><b>${esc(s.nombre)}</b><span class="s code">${esc(s.qr)}</span></div>${s.salio?`<span class="pill ok">${esc(s.salio.split(' · ')[0])}</span>`:'<span class="pill">En escuela</span>'}</div>`).join('')||'<p class="muted">No hay alumnos en tu grupo.</p>'}</div>
+  <p class="muted">El código sirve para corroborar el QR que te muestran.</p></section>`;
+},
+maestro_permisos(){
+  const d=D.maestro;if(!d)return cargando;
+  return `<form class="card form" id="f-permiso"><h2>Que otro maestro entregue a ${esc(d.yo.grupo)}</h2><p class="muted">El permiso dura solo hoy.</p>
+  <label class="f" for="gt">Maestro<select id="gt">${d.maestros.map(t=>`<option value="${t.id}">${esc(t.nombre)} · ${esc(t.grupo)}</option>`).join('')}</select></label>
+  <button class="btn pri full" type="submit">Dar permiso por hoy</button>
+  ${d.dados.map(g=>`<div class="item" style="cursor:default"><div class="grow"><b>${esc(g.nombre)}</b><span class="s">Puede entregar a tu grupo hoy</span></div><button class="btn warn sm" type="button" data-a="quitarpermiso" data-id="${g.id}">Quitar</button></div>`).join('')}</form>
+  <section class="card"><h3>Te dieron permiso hoy</h3>${d.recibidos.length?d.recibidos.map(g=>`<div class="item" style="cursor:default"><div class="grow"><b>${esc(g.grupo)}</b><span class="s">De ${esc(g.de)}</span></div></div>`).join(''):'<p class="muted">Ninguno.</p>'}</section>`;
+},
+maestro_hoy(){const d=D.maestro;if(!d)return cargando;return `<section class="card"><h3>Toda la escuela</h3>${listaSalidas(d.salidas,'Todavía no hay salidas hoy.')}</section>`},
+/* ===== DIRECCIÓN ===== */
+dir_inicio(){
+  const d=D.resumen;if(!d)return cargando;
+  return `<div class="stats"><div class="stat"><b>${d.total}</b><span>Alumnos</span></div><div class="stat"><b>${d.salidasHoy}</b><span>Salidas hoy</span></div><div class="stat"><b>${d.maestros}</b><span>Maestros</span></div></div>
+  ${d.sinPersonas?`<section class="card" style="border-color:var(--mark)"><p><b>${d.sinPersonas} alumnos</b> no tienen personas autorizadas registradas. Agrégalas desde la ficha de cada alumno.</p></section>`:''}
+  <div class="row"><button class="btn pri grow" data-a="alta">+ Alumno</button><button class="btn grow" data-a="importar">Importar Excel</button></div>
+  <section class="card"><h3>Salidas de hoy por grupo</h3><div class="grupos">${d.grupos.map(g=>`<button data-a="vergrupo" data-g="${g}"><b>${g}</b><span>${d.conteo[g].salidas}/${d.conteo[g].alumnos}</span></button>`).join('')}</div></section>
+  <section class="card"><h3>Últimas salidas</h3>${listaSalidas(d.ultimas,'Todavía no hay salidas hoy.')}</section>
+  <p class="muted">Correos de aviso disponibles hoy: ${d.correosRestantes}</p>`;
+},
+dir_alumnos(){
+  return `<input id="busca" type="search" placeholder="Buscar por nombre o CURP" aria-label="Buscar alumno" value="${esc(D.busqueda||'')}" autocomplete="off">
+  <div class="chips" ${D.busqueda?'hidden':''}>${GRUPOS.map(g=>`<button aria-pressed="${g===grupoSel}" data-g="${g}">${g}</button>`).join('')}</div>
+  <button class="btn pri full" data-a="alta">+ Dar de alta alumno</button>
+  <section class="card" id="listaAl">${D.busqueda?cargando:listaAlumnos(D.lista)}</section>`;
+},
+dir_maestros(){
+  const d=D.maestros;if(!d)return cargando;
+  return `<button class="btn pri full" data-a="nuevomaestro">+ Agregar maestro</button>
+  <section class="card"><div class="list">${d.map(m=>`<button class="item" data-a="vermaestro" data-id="${m.id}"><span class="av" aria-hidden="true">${esc(m.grupo)}</span><span class="grow"><b>${esc(m.nombre)}</b><span class="s">Usuario ${esc(m.usuario)} · Contraseña ${esc(m.contrasena)}</span></span>${I.chev}</button>`).join('')||'<p class="muted">Todavía no hay maestros.</p>'}</div></section>`;
+},
+dir_mas(){
+  const item=(a,t,s)=>`<button class="item" data-a="${a}"><span class="grow"><b>${t}</b><span class="s">${s}</span></span>${I.chev}</button>`;
+  return `<section class="card"><div class="list">
+  ${item('importar','Importar alumnos desde Excel','Sube el archivo desde el teléfono o la computadora')}
+  ${item('reportes','Reportes de salidas','Por día, grupo o alumno; descarga en Excel')}
+  ${item('clave','Contraseña de dirección','Cámbiala periódicamente')}
+  ${item('ciclo','Cerrar ciclo escolar','Sube a todos de grado y archiva el historial')}
+  </div></section>
+  ${D.resumen&&D.resumen.hojaUrl?`<a class="btn full" href="${esc(D.resumen.hojaUrl)}" target="_blank" rel="noopener">Abrir base de datos en Drive</a>`:''}`;
+}
+};
+
+function listaAlumnos(l){
+  if(!l)return cargando;
+  if(!l.length)return '<p class="muted">No hay alumnos aquí. Dalos de alta o impórtalos desde Excel.</p>';
+  return `<div class="list">${l.map(a=>`<button class="item" data-a="ficha" data-id="${a.id}"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${a.grupo?esc(a.grupo)+' · ':''}${a.tutor!==undefined?'Tutor: '+esc(a.tutor)+' · PIN '+esc(a.pin):(a.activo===false?'Dado de baja':'')}</span></span>${I.chev}</button>`).join('')}</div>`;
+}
+
+function formPersona(famId){
+  return `<form class="card form" id="f-persona" ${famId?`data-fam="${esc(famId)}"`:''}><h3>Agregar persona autorizada</h3>
+  <label class="f" for="pn">Nombre completo<input id="pn" required autocomplete="off"></label>
+  <label class="f" for="pr">Parentesco<select id="pr">${PARENTESCOS.map(x=>`<option>${x}</option>`).join('')}</select></label>
+  <label class="f" for="pf">Foto del rostro<input id="pf" type="file" accept="image/*" required></label>
+  <button class="btn pri full" type="submit">Agregar</button></form>`;
+}
+
+/* ===== Pantallas secundarias (dirección) ===== */
+const SUB={
+ficha(){
+  const d=D.ficha;if(!d||d.alumno.id!==sub.id)return cargando;
+  const a=d.alumno,f=d.familia;
+  return `<section class="card"><div class="row">${av(a.nombre,a.foto,'xl')}<div class="grow"><h1>${esc(a.nombre)}</h1><span class="muted">${esc(a.grupo)}</span>${a.activo?'':' <span class="pill bad">Dado de baja</span>'}</div></div>
+  <label class="btn full" for="fa">Cambiar foto del alumno<input id="fa" type="file" accept="image/*" hidden></label></section>
+  <section class="card"><h3>Código QR</h3><div class="qrwrap"><div class="qr" data-code="${esc(a.qr)}"></div><span class="code muted">${esc(a.qr)}</span></div>
+  ${confirmar==='qr'?`<div class="confirm">El código actual dejará de funcionar.<div class="row"><button class="btn warn grow" data-a="nuevoqr" data-id="${a.id}">Sí, cambiarlo</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`:`<button class="btn full" data-a="pedir" data-k="qr">Cambiar código QR</button>`}</section>
+  <form class="card form" id="f-alumno"><h3>Datos del alumno</h3>
+  <label class="f" for="en">Nombre completo<input id="en" value="${esc(a.nombre)}"></label>
+  <label class="f" for="ec">CURP<input id="ec" value="${esc(a.curp)}" maxlength="18" autocapitalize="characters"></label>
+  <label class="f" for="eg">Grupo<select id="eg">${GRUPOS.map(g=>`<option ${g===a.grupo?'selected':''}>${g}</option>`).join('')}</select></label>
+  <button class="btn pri full" type="submit">Guardar cambios</button></form>
+  <form class="card form" id="f-familia" data-id="${esc(f.id)}"><h3>Familia</h3>
+  <label class="f" for="ft">Tutor<input id="ft" value="${esc(f.tutor)}"></label>
+  <label class="f" for="fp">PIN de acceso<input id="fp" value="${esc(f.pin)}" inputmode="numeric" maxlength="6"></label>
+  <label class="f" for="fc">Correo para avisos<input id="fc" type="email" inputmode="email" value="${esc(f.correo)}"></label>
+  <label class="f" for="fte">Teléfono<input id="fte" type="tel" value="${esc(f.telefono)}"></label>
+  <p class="muted">El padre entra con el CURP del hijo mayor inscrito y este PIN.</p>
+  <div class="row"><button class="btn pri grow" type="submit">Guardar</button><button class="btn grow" type="button" data-a="pinnuevo" data-id="${esc(f.id)}">PIN al azar</button></div>
+  ${d.hermanos.length?`<h3>Hermanos</h3><div class="list">${d.hermanos.map(h=>`<button class="item" type="button" data-a="ficha" data-id="${h.id}"><span class="grow"><b>${esc(h.nombre)}</b><span class="s">${esc(h.grupo)}</span></span>${I.chev}</button>`).join('')}</div>`:''}</form>
+  <section class="card"><h3>Personas autorizadas</h3><div class="list">${d.personas.map(p=>`<div class="item" style="cursor:default">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
+  ${confirmar==='p'+p.id?`<button class="btn warn sm" data-a="quitarp" data-id="${p.id}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="p${p.id}">Quitar</button>`}</div>`).join('')||'<p class="muted">Sin personas autorizadas. Agrégalas con los datos de la hoja de autorización.</p>'}</div></section>
+  ${formPersona(f.id)}
+  <section class="card"><h3>Últimas salidas</h3>${listaSalidas(d.salidas,'Sin salidas registradas.')}</section>
+  ${confirmar==='baja'?`<div class="confirm">${a.activo?'El alumno dejará de aparecer en listas y su QR dejará de funcionar.':'El alumno volverá a estar activo.'}<div class="row"><button class="btn warn grow" data-a="baja" data-id="${a.id}" data-v="${a.activo?0:1}">Confirmar</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`
+  :`<button class="btn ${a.activo?'warn':''} full" data-a="pedir" data-k="baja">${a.activo?'Dar de baja':'Reactivar alumno'}</button>`}`;
+},
+alta(){
+  return `<h1>Dar de alta alumno</h1><form class="card form" id="f-alta">
+  <label class="f" for="an">Nombre completo<input id="an" required autocomplete="off"></label>
+  <label class="f" for="ac">CURP<input id="ac" maxlength="18" required autocapitalize="characters" spellcheck="false"></label>
+  <label class="f" for="ag">Grupo<select id="ag">${GRUPOS.map(g=>`<option ${g===grupoSel?'selected':''}>${g}</option>`).join('')}</select></label>
+  <h3>¿Tiene hermanos inscritos?</h3>
+  <input type="hidden" id="ah"><div id="ahsel"></div>
+  <label class="f" for="ahq">Buscar hermano (déjalo vacío si es familia nueva)<input id="ahq" type="search" autocomplete="off" placeholder="Nombre del hermano"></label>
+  <div id="ahres" class="list"></div>
+  <div id="famnueva" class="form"><h3>Familia nueva</h3>
+  <label class="f" for="at">Nombre del tutor<input id="at" autocomplete="off"></label>
+  <label class="f" for="ae">Correo para avisos<input id="ae" type="email" inputmode="email" autocomplete="off"></label>
+  <label class="f" for="aw">Teléfono<input id="aw" type="tel" autocomplete="off"></label></div>
+  <button class="btn pri big full" type="submit">Dar de alta</button></form>`;
+},
+maestro(){
+  const m=sub.id&&D.maestros?D.maestros.find(x=>x.id===sub.id):null;
+  if(sub.id&&!m)return cargando;
+  const libres=GRUPOS.filter(g=>!(D.maestros||[]).some(x=>x.grupo===g&&(!m||x.id!==m.id)));
+  return `<h1>${m?'Editar maestro':'Agregar maestro'}</h1><form class="card form" id="f-maestro" data-id="${m?esc(m.id):''}">
+  <label class="f" for="mn">Nombre completo<input id="mn" required value="${esc(m?m.nombre:'')}"></label>
+  <label class="f" for="mg">Grupo<select id="mg">${libres.map(g=>`<option ${m&&m.grupo===g?'selected':''}>${g}</option>`).join('')}</select></label>
+  <label class="f" for="mu">Usuario<input id="mu" required autocapitalize="none" spellcheck="false" value="${esc(m?m.usuario:'')}"></label>
+  <label class="f" for="mc">Contraseña<input id="mc" value="${esc(m?m.contrasena:'')}" placeholder="Déjala vacía para generar una"></label>
+  <label class="f" for="me">Correo<input id="me" type="email" inputmode="email" value="${esc(m?m.correo:'')}"></label>
+  <button class="btn pri big full" type="submit">Guardar</button></form>
+  ${m?(confirmar==='delm'?`<div class="confirm">${esc(m.nombre)} ya no podrá entrar.<div class="row"><button class="btn warn grow" data-a="delmaestro" data-id="${m.id}">Eliminar</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`:`<button class="btn warn full" data-a="pedir" data-k="delm">Eliminar maestro</button>`):''}`;
+},
+importar(){
+  const p=D.imp;
+  let h=`<h1>Importar alumnos</h1><section class="card"><p>Sube un Excel con una fila por alumno y estas columnas:</p>
+  <p class="muted"><b>Nombre</b>, <b>CURP</b>, <b>Grupo</b> (ej. 3A), Tutor, Teléfono, Correo, CURP hermano mayor.</p>
+  <p class="muted">Para hermanos: el mayor va sin hermano; los menores llevan el CURP del mayor en la última columna.</p>
+  <button class="btn full" data-a="plantilla">Descargar plantilla de Excel</button>
+  <label class="btn pri big full" for="xls">Elegir archivo de Excel<input id="xls" type="file" accept=".xlsx,.xls,.csv" hidden></label></section>`;
+  if(p&&p.filas){
+    h+=`<section class="card"><h2>${p.filas.length} alumnos encontrados</h2>${p.faltan?`<p class="pill bad" style="align-self:flex-start">No encontré la columna: ${esc(p.faltan)}</p>`:''}
+    <div class="tbl"><table><thead><tr><th>Nombre</th><th>CURP</th><th>Grupo</th><th>Hermano</th>${p.res?'<th>Resultado</th>':''}</tr></thead><tbody>
+    ${p.filas.map((r,i)=>`<tr><td>${esc(r.nombre)}</td><td class="code">${esc(r.curp)}</td><td>${esc(r.grupo)}</td><td class="code">${esc(r.curpHermano)}</td>${p.res?`<td>${p.res[i]?`<span class="pill ${p.res[i].ok?'ok':'bad'}">${esc(p.res[i].msg)}</span>`:'…'}</td>`:''}</tr>`).join('')}
+    </tbody></table></div>
+    ${p.res?`<p><b>${p.res.filter(x=>x&&x.ok).length}</b> dados de alta · <b>${p.res.filter(x=>x&&!x.ok).length}</b> con error</p>`:`<button class="btn pri big full" data-a="subirimp" ${p.faltan?'disabled':''}>Importar ${p.filas.length} alumnos</button>`}</section>`;
+  }
+  return h;
+},
+reportes(){
+  const f=D.filtro||{};
+  return `<h1>Reportes</h1><form class="card form" id="f-reporte">
+  <label class="f" for="rg">Grupo<select id="rg"><option value="">Todos</option>${GRUPOS.map(g=>`<option ${f.grupo===g?'selected':''}>${g}</option>`).join('')}</select></label>
+  <label class="f" for="rn">Alumno<input id="rn" type="search" value="${esc(f.alumno||'')}" placeholder="Nombre (opcional)"></label>
+  <div class="row"><label class="f grow" for="rd">Desde<input id="rd" type="date" value="${esc(f.desde||'')}"></label><label class="f grow" for="rh">Hasta<input id="rh" type="date" value="${esc(f.hasta||'')}"></label></div>
+  <div class="row"><button class="btn pri grow" type="submit">Ver</button><button class="btn grow" type="button" data-a="excel">Descargar Excel</button></div></form>
+  ${D.reporte?`<section class="card"><h3>${D.reporte.length} salidas</h3>${listaSalidas(D.reporte.slice(0,200),'Sin salidas con esos filtros.')}${D.reporte.length>200?'<p class="muted">Se muestran las 200 más recientes. Descarga el Excel para verlas todas.</p>':''}</section>`:''}`;
+},
+clave(){
+  return `<h1>Contraseña de dirección</h1><form class="card form" id="f-clave">
+  <label class="f" for="ka">Contraseña actual<input id="ka" type="password" autocomplete="current-password"></label>
+  <label class="f" for="kn">Nueva contraseña (mínimo 6)<input id="kn" type="password" autocomplete="new-password"></label>
+  <button class="btn pri big full" type="submit">Cambiar</button></form>`;
+},
+ciclo(){
+  return `<h1>Cerrar ciclo escolar</h1><section class="card"><p>Esto hace tres cosas:</p>
+  <p class="muted">1. Sube a todos los alumnos un grado (3°A pasa a 4°A).<br>2. Da de baja a los de 6° como egresados. Si tenían hermanos menores, la cuenta pasa al siguiente hermano.<br>3. Guarda el historial de salidas en otra pestaña de la hoja y empieza uno nuevo.</p>
+  <p class="muted">Después revisa en Maestros que cada uno tenga su grupo nuevo.</p></section>
+  <form class="card form" id="f-ciclo"><label class="f" for="cic">Escribe CERRAR para confirmar<input id="cic" autocapitalize="characters" autocomplete="off"></label>
+  <button class="btn warn big full" type="submit">Cerrar ciclo</button></form>`;
+}
+};
+
+/* ---------- Escáner ---------- */
+async function abrirCamara(){
+  if(typeof Html5Qrcode==='undefined'){toast('No se pudo cargar el lector. Escribe el código.');return}
+  const el=$('lector'),btn=$('btncam');if(!el)return;
+  scan.hecho=null;scan.res=null;scan.code='';
+  el.hidden=false;btn.innerHTML='Cerrar cámara';btn.dataset.a='cerrarcam';
+  let leido=false;
+  try{
+    lector=new Html5Qrcode('lector');
+    await lector.start({facingMode:'environment'},{fps:10,qrbox:(w,h)=>{const s=Math.floor(Math.min(w,h)*0.7);return{width:s,height:s}}},
+      async texto=>{if(leido)return;leido=true;if(navigator.vibrate)navigator.vibrate(80);await cerrarCamara();buscar(texto)},()=>{});
+  }catch(e){await cerrarCamara();render();toast('No se pudo abrir la cámara. Revisa el permiso del navegador o escribe el código.')}
+}
+async function cerrarCamara(){
+  if(lector){const l=lector;lector=null;try{await l.stop()}catch(e){}try{l.clear()}catch(e){}}
+}
+async function buscar(texto){
+  let c=String(texto||'').trim();
+  try{const u=new URL(c);c=u.searchParams.get('qr')||c}catch(e){}
+  c=c.toUpperCase();const m=c.match(/QR-[A-Z0-9]+/);if(m)c=m[0];
+  if(!c)return;
+  scan.code=c;scan.res=null;scan.hecho=null;scan.buscando=true;render();
+  try{scan.res=await api('buscarQR',tok(),c)}catch(e){scan.res={valido:false};toast(e.message)}
+  finally{scan.buscando=false}
+  if(tab==='escanear'&&!sub)render();
+}
+
+/* ---------- Excel ---------- */
+const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'');
+function leerExcel(file){
+  return new Promise((ok,mal)=>{const r=new FileReader();r.onload=()=>{try{
+    const wb=XLSX.read(new Uint8Array(r.result),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
+    if(!rows.length)return mal(new Error('El archivo está vacío.'));
+    const keys=Object.keys(rows[0]);const find=t=>keys.find(k=>t(norm(k)));
+    const kN=find(k=>k.includes('nombre')&&!k.includes('tutor')&&!k.includes('padre')&&!k.includes('herman'));
+    const kC=find(k=>k.includes('curp')&&!k.includes('herman'));
+    const kG=find(k=>k==='grupo'||k.includes('grupo'));const kGr=find(k=>k==='grado'||k.includes('grado'));
+    const kT=find(k=>k.includes('tutor')||k.includes('padre')||k.includes('madre'));
+    const kTel=find(k=>k.includes('tel')||k.includes('cel')||k.includes('whats'));
+    const kE=find(k=>k.includes('correo')||k.includes('email')||k.includes('mail'));
+    const kH=find(k=>k.includes('herman'));
+    const faltan=[!kN&&'Nombre',!kC&&'CURP',!kG&&'Grupo'].filter(Boolean).join(', ');
+    const filas=rows.map(x=>{let g=String(x[kG]||'').trim();if(kGr&&kGr!==kG&&/^[AB]$/i.test(g))g=String(x[kGr]).trim()+g;
+      return{nombre:String(x[kN]||'').trim(),curp:String(x[kC]||'').trim().toUpperCase(),grupo:g,tutor:kT?String(x[kT]).trim():'',telefono:kTel?String(x[kTel]).trim():'',correo:kE?String(x[kE]).trim():'',curpHermano:kH?String(x[kH]).trim().toUpperCase():''}}).filter(x=>x.nombre||x.curp);
+    ok({filas,faltan});
+  }catch(e){mal(new Error('No pude leer el archivo. Guárdalo como .xlsx e intenta de nuevo.'))}};r.onerror=()=>mal(new Error('No pude leer el archivo.'));r.readAsArrayBuffer(file)});
+}
+function descargar(blob,nombre){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+
+/* ---------- Eventos ---------- */
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.tab){ir(b.dataset.tab);return}
+  if(b.dataset.lr){rolLogin=b.dataset.lr;guardar('ultimoRol',rolLogin);render();return}
+  if(b.dataset.g&&!b.dataset.a){grupoSel=b.dataset.g;guardar('grupoSel',grupoSel);D.lista=null;render();await cargar();return}
+  const a=b.dataset.a,id=b.dataset.id;if(!a)return;
+  switch(a){
+    case 'salir':return cerrarSesion();
+    case 'atras':return atras();
+    case 'cancelar':confirmar=null;return render();
+    case 'pedir':confirmar=b.dataset.k;return render();
+    case 'camara':return abrirCamara();
+    case 'cerrarcam':await cerrarCamara();return render();
+    case 'siguiente':scan={code:'',res:null,hecho:null};render();return abrirCamara();
+    case 'ficha':D.ficha=null;return abrir({t:'ficha',id});
+    case 'alta':return abrir({t:'alta'});
+    case 'importar':D.imp=null;return abrir({t:'importar'});
+    case 'reportes':return abrir({t:'reportes'});
+    case 'clave':return abrir({t:'clave'});
+    case 'ciclo':return abrir({t:'ciclo'});
+    case 'nuevomaestro':return abrir({t:'maestro'});
+    case 'vermaestro':return abrir({t:'maestro',id});
+    case 'vergrupo':grupoSel=b.dataset.g;guardar('grupoSel',grupoSel);D.lista=null;D.busqueda='';return ir('alumnos');
+    case 'pickh':$('ah').value=b.dataset.curp;$('ahsel').innerHTML=`<div class="item" style="cursor:default"><div class="grow"><b>${esc(b.dataset.n)}</b><span class="s">Mismo PIN y cuenta que su hermano</span></div><button class="btn sm" type="button" data-a="unpickh">Quitar</button></div>`;$('ahres').innerHTML='';$('ahq').value='';$('famnueva').hidden=true;return;
+    case 'unpickh':$('ah').value='';$('ahsel').innerHTML='';$('famnueva').hidden=false;return;
+    case 'plantilla':{const ws=XLSX.utils.aoa_to_sheet([['Nombre','CURP','Grupo','Tutor','Telefono','Correo','CURP hermano mayor'],['Ana López García','LOGA150312MNLPRN05','3A','María García','8112345678','maria@correo.com',''],['Luis López García','LOGL170905HNLPRS02','1A','','','','LOGA150312MNLPRN05']]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Alumnos');XLSX.writeFile(wb,'plantilla-alumnos.xlsx');return}
+  }
+  await hacer(b,async()=>{
+    switch(a){
+      case 'nuevoqr':await api('cambiarQR',tok(),id);confirmar=null;toast('Código QR cambiado. El anterior ya no funciona.');if(sub)await cargarSub();else await cargar();break;
+      case 'quitarp':await api('quitarPersona',tok(),id);confirmar=null;toast('Persona quitada.');if(sub)await cargarSub();else await cargar();break;
+      case 'quitarpermiso':await api('quitarPermiso',tok(),id);toast('Permiso quitado.');await cargar();break;
+      case 'pinnuevo':{const p=await api('restablecerPin',tok(),id);toast('PIN nuevo: '+p);await cargarSub();break}
+      case 'baja':await api('editarAlumno',tok(),{id,activo:b.dataset.v==='1'});confirmar=null;toast(b.dataset.v==='1'?'Alumno reactivado.':'Alumno dado de baja.');await cargarSub();break;
+      case 'delmaestro':await api('guardarMaestro',tok(),{id,eliminar:true});toast('Maestro eliminado.');D.maestros=null;atras();break;
+      case 'salida':{const sel=document.querySelector('input[name=pk]:checked');if(!sel){toast('Toca la foto de quien recoge al alumno.');return}
+        const r=await api('registrarSalida',tok(),id,sel.value);scan.hecho={hora:r.hora,correo:r.correo,alumno:b.dataset.n,persona:sel.dataset.n};scan.res=null;scan.code='';render();window.scrollTo(0,0);break}
+      case 'excel':{const r=await api('exportarExcel',tok(),filtroRep());const bin=atob(r.base64);const u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);descargar(new Blob([u8],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre);break}
+      case 'subirimp':{const p=D.imp;p.res=new Array(p.filas.length);render();
+        for(let i=0;i<p.filas.length;i+=60){const r=await api('importarFilas',tok(),p.filas.slice(i,i+60));r.forEach((x,j)=>p.res[i+j]=x);render()}
+        toast('Importación terminada.');break}
+    }
+  });
+});
+
+let tBusca;
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='busca'){clearTimeout(tBusca);const q=t.value.trim();tBusca=setTimeout(async()=>{
+    D.busqueda=q;document.querySelector('.chips').hidden=!!q;
+    const box=$('listaAl');if(!q){box.innerHTML=listaAlumnos(D.lista);if(!D.lista)cargar();return}
+    if(q.length<2)return;box.innerHTML=cargando;
+    try{const r=await api('buscarAlumnos',tok(),q);if(D.busqueda===q)box.innerHTML=listaAlumnos(r)}catch(err){toast(err.message)}},350)}
+  if(t.id==='ahq'){clearTimeout(tBusca);const q=t.value.trim();tBusca=setTimeout(async()=>{
+    const box=$('ahres');if(q.length<2){box.innerHTML='';return}
+    try{const r=await api('buscarAlumnos',tok(),q);box.innerHTML=r.filter(x=>x.activo).map(x=>`<button class="item" type="button" data-a="pickh" data-curp="${esc(x.curp)}" data-n="${esc(x.nombre)}"><span class="grow"><b>${esc(x.nombre)}</b><span class="s">${esc(x.grupo)}</span></span></button>`).join('')||'<p class="muted">Sin resultados.</p>'}catch(err){toast(err.message)}},350)}
+});
+
+document.addEventListener('change',async e=>{
+  const t=e.target;
+  if(t.id==='fa'&&t.files[0]){await hacer(null,async()=>{toast('Subiendo foto…');await api('fotoAlumno',tok(),sub.id,await leerFoto(t.files[0]));toast('Foto actualizada.');await cargarSub()})}
+  if(t.id==='xls'&&t.files[0]){await hacer(null,async()=>{D.imp=await leerExcel(t.files[0]);render()})}
+});
+
+const filtroRep=()=>({grupo:val('rg'),alumno:val('rn'),desde:val('rd'),hasta:val('rh')});
+
+document.addEventListener('submit',async e=>{
+  e.preventDefault();const f=e.target,btn=f.querySelector('button[type=submit]');
+  await hacer(btn,async()=>{
+    switch(f.id){
+      case 'f-login':{const r=await api('entrar',rolLogin,val('lu'),val('lp'));ses=r;guardar('sesion',r);tab='';sub=null;D={};render();await cargar();break}
+      case 'f-scan':await buscar(val('qrin'));break;
+      case 'f-persona':{const file=$('pf').files[0];if(!file){toast('Agrega la foto del rostro.');return}
+        await api('agregarPersona',tok(),{nombre:val('pn'),parentesco:val('pr'),foto:await leerFoto(file),famId:f.dataset.fam||''});toast('Persona agregada.');if(sub)await cargarSub();else await cargar();break}
+      case 'f-contacto':await api('cambiarContacto',tok(),{correo:val('cc'),telefono:val('ct')});toast('Datos guardados.');await cargar();break;
+      case 'f-pin':await api('cambiarPin',tok(),val('np'));toast('PIN actualizado.');f.reset();break;
+      case 'f-permiso':await api('darPermiso',tok(),val('gt'));toast('Permiso dado por hoy.');await cargar();break;
+      case 'f-alumno':await api('editarAlumno',tok(),{id:sub.id,nombre:val('en'),curp:val('ec'),grupo:val('eg')});toast('Cambios guardados.');D.lista=null;await cargarSub();break;
+      case 'f-familia':await api('editarFamilia',tok(),{id:f.dataset.id,tutor:val('ft'),pin:val('fp'),correo:val('fc'),telefono:val('fte')});toast('Familia actualizada.');await cargarSub();break;
+      case 'f-alta':{const r=await api('altaAlumno',tok(),{nombre:val('an'),curp:val('ac'),grupo:val('ag'),curpHermano:val('ah'),tutor:val('at'),correo:val('ae'),telefono:val('aw')});
+        toast(r.hermano?'Alumno agregado a la cuenta de su hermano.':'Alumno dado de alta. PIN de la familia: '+r.pin);grupoSel=val('ag');D.lista=null;D.ficha=null;sub={t:'ficha',id:r.id};render();await cargarSub();break}
+      case 'f-maestro':{const r=await api('guardarMaestro',tok(),{id:f.dataset.id||'',nombre:val('mn'),grupo:val('mg'),usuario:val('mu'),contrasena:val('mc'),correo:val('me')});
+        toast('Guardado. Contraseña: '+r.contrasena);D.maestros=await api('listaMaestros',tok());atras();break}
+      case 'f-reporte':D.filtro=filtroRep();D.reporte=await api('reporte',tok(),D.filtro);render();break;
+      case 'f-clave':await api('cambiarClaveDir',tok(),val('ka'),val('kn'));toast('Contraseña cambiada.');atras();break;
+      case 'f-ciclo':{const r=await api('cerrarCicloDir',tok(),val('cic'));toast(`Ciclo cerrado: ${r.subieron} subieron de grado, ${r.egresaron} egresaron.`);atras();break}
+    }
+  });
+});
+
+/* ---------- Inicio ---------- */
+render();
+if(ses)cargar();
+</script>
+</body>
+</html>
