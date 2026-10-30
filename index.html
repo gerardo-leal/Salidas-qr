@@ -13,20 +13,24 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
+/* Una columna para celular; barra inferior por rol; acciones principales como botones grandes */
 :root{
   --bg:#eef2f4; --card:#fff; --fg:#17232b; --muted:#5a6b75; --line:#d3dde2;
   --accent:#0f6b6e; --accent-soft:#dbefee; --mark:#f2b134; --ok:#2e7d4f; --ok-soft:#dff1e6; --bad:#b3402f; --bad-soft:#f8e1dc;
+  --warn:#8a5a00; --warn-soft:#fbefd5;
   --display:"Bitter",Georgia,serif; --body:"Lexend",system-ui,-apple-system,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#10181c; --card:#18242a; --fg:#e4ecef; --muted:#93a6af; --line:#2a3a42;
-  --accent:#4cc0c2; --accent-soft:#173a3c; --ok:#5cc28a; --ok-soft:#173326; --bad:#e8826f; --bad-soft:#3a1f1a; color-scheme:dark}}
+  --accent:#4cc0c2; --accent-soft:#173a3c; --ok:#5cc28a; --ok-soft:#173326; --bad:#e8826f; --bad-soft:#3a1f1a;
+  --warn:#f2b134; --warn-soft:#3a2e12; color-scheme:dark}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45}
 body{padding:calc(12px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
 body.sinbarra{padding-bottom:32px}
+body.noscroll{overflow:hidden}
 .wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-h1{font-family:var(--display);font-size:1.25rem;margin:0;line-height:1.2}
+h1{font-family:var(--display);font-size:1.25rem;margin:0;line-height:1.2;text-wrap:balance}
 h2{font-family:var(--display);font-size:1.08rem;margin:0}
 h3{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
 p{margin:0}
@@ -40,68 +44,98 @@ p{margin:0}
 .btn.warn{color:var(--bad);border-color:var(--bad)}
 .btn.full{width:100%}
 .btn.big{min-height:56px;font-size:1.05rem}
+.btn.xl{min-height:68px;font-size:1.12rem;border-radius:18px}
 .btn.sm{min-height:36px;padding:6px 12px;font-size:.85rem}
 .btn:disabled{opacity:.55}
 .btn svg{width:24px;height:24px;flex:none}
-button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 input,select{font:inherit;font-size:16px;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);width:100%}
 label.f{display:flex;flex-direction:column;gap:5px;font-size:.88rem;font-weight:500}
 .form{display:flex;flex-direction:column;gap:12px}
-.av{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-weight:600;color:#fff;flex:none;object-fit:cover;background:var(--accent);font-size:.95rem}
+.av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:600;color:#fff;flex:none;object-fit:cover;background:var(--accent);font-size:.9rem}
 .av.lg{width:84px;height:84px;border-radius:16px;font-size:1.4rem}
-.av.xl{width:120px;height:120px;border-radius:20px;font-size:1.8rem}
+.av.xl{width:96px;height:96px;border-radius:18px;font-size:1.6rem}
+.av.gr{background:var(--accent-soft);color:var(--accent);font-size:.8rem}
 .list{display:flex;flex-direction:column}
-.item{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left;width:100%;cursor:pointer}
+.item{display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left;width:100%;cursor:pointer}
+div.item{cursor:default}
 .item:last-child{border-bottom:0}
 .item b{display:block;font-weight:500}
 .item span.s{display:block;font-size:.84rem;color:var(--muted)}
 .chev{color:var(--muted);flex:none}
-.pill{font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.pill{font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.pill svg{width:14px;height:14px}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.gris{background:var(--bg);color:var(--muted)}
 .code{font-family:ui-monospace,Menlo,monospace;font-size:.88rem;letter-spacing:.03em;word-break:break-all}
 .qrwrap{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
 .qr{background:#fff;padding:12px;border-radius:14px;line-height:0}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .stat b{font-family:var(--display);font-size:1.5rem;font-variant-numeric:tabular-nums}
 .stat span{font-size:.75rem;color:var(--muted)}
-.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chips button{font:inherit;font-size:.9rem;font-weight:500;min-height:40px;padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--fg);white-space:nowrap;cursor:pointer}
 .chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.chips.envolver{flex-wrap:wrap;overflow:visible}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg);border-radius:12px;padding:4px}
+.seg button{font:inherit;font-size:.9rem;font-weight:500;min-height:44px;border:0;border-radius:9px;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px}
+.seg button svg{width:20px;height:20px}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .grupos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 @media (min-width:560px){.grupos{grid-template-columns:repeat(6,1fr)}}
 .grupos button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:12px;padding:10px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
 .grupos b{font-family:var(--display);font-size:1.1rem}
 .grupos span{font-size:.7rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.acciones{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .result{border:2px solid var(--ok)}
 .result.no{border-color:var(--bad)}
 .pick{display:flex;flex-direction:column;gap:10px}
-.pick label{display:flex;gap:12px;align-items:center;border:2px solid var(--line);border-radius:14px;padding:10px;cursor:pointer}
-.pick label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
-.pick input{width:22px;min-height:22px;height:22px;flex:none;accent-color:var(--accent)}
+.pick label,.chk{display:flex;gap:12px;align-items:center;border:2px solid var(--line);border-radius:14px;padding:10px;cursor:pointer}
+.pick label:has(input:checked),.chk:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.pick input,.chk input{width:24px;min-height:24px;height:24px;flex:none;accent-color:var(--accent)}
+.chk.off{cursor:default;opacity:.75}
 .muted{color:var(--muted);font-size:.86rem}
+.nota{font-size:.86rem;background:var(--warn-soft);color:var(--fg);border-radius:12px;padding:10px 12px}
 .confirm{background:var(--bad-soft);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;font-size:.92rem}
 .cargando{text-align:center;color:var(--muted);padding:40px 10px}
-.salida{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--line)}
+.salida{display:flex;flex-direction:column;gap:3px;padding:10px 0;border-bottom:1px solid var(--line)}
 .salida:last-child{border-bottom:0}
 .salida .h{font-variant-numeric:tabular-nums;font-weight:600}
-#lector{width:100%;border-radius:14px;overflow:hidden;background:#000}
-#lector video{width:100%!important;border-radius:14px}
+.hecho{text-align:center;align-items:center;border:2px solid var(--ok)}
+.check{width:76px;height:76px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center}
+.check svg{width:44px;height:44px}
+.horag{font-family:var(--display);font-size:2.3rem;font-variant-numeric:tabular-nums;line-height:1}
+details summary{cursor:pointer;color:var(--accent);font-weight:500;padding:6px 0;list-style:none}
+details summary::-webkit-details-marker{display:none}
 nav.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);z-index:10;
   padding:4px max(6px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
 nav.bar div{max-width:720px;margin:0 auto;display:flex}
-nav.bar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:.7rem;font-weight:500;background:none;border:0;color:var(--muted);padding:8px 0 6px;cursor:pointer;min-height:56px}
+nav.bar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:.72rem;font-weight:500;background:none;border:0;color:var(--muted);padding:8px 0 6px;cursor:pointer;min-height:56px}
 nav.bar button[aria-current="page"]{color:var(--accent)}
 nav.bar svg{width:24px;height:24px}
-.back{display:flex;align-items:center;gap:6px;font:inherit;font-weight:500;background:none;border:0;color:var(--accent);padding:6px 0;cursor:pointer;min-height:44px}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:12px;font-size:.92rem;width:max-content;max-width:calc(100% - 28px);z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.2)}
-.login{max-width:440px;margin:0 auto;width:100%;padding-top:4vh}
-.login h1{font-size:1.45rem;text-wrap:balance}
+.back{display:flex;align-items:center;gap:6px;font:inherit;font-weight:500;background:none;border:0;color:var(--accent);padding:6px 0;cursor:pointer;min-height:44px;align-self:flex-start}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:12px;font-size:.92rem;width:max-content;max-width:calc(100% - 28px);z-index:40;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+#cam{position:fixed;inset:0;z-index:30;background:#0b1114;color:#fff;display:flex;flex-direction:column;gap:12px;
+  padding:calc(12px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+#cam .camtop{display:flex;justify-content:space-between;align-items:center;gap:10px;max-width:720px;width:100%;margin:0 auto}
+#cam .camtop b{font-size:1.05rem}
+#cam .btn{background:#1f2c33;border-color:#2f4049;color:#fff}
+#cam .btn.pri{background:#4cc0c2;border-color:#4cc0c2;color:#0b1114}
+#cam input{background:#1f2c33;border-color:#2f4049;color:#fff}
+#cam .cuerpo{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;max-width:720px;width:100%;margin:0 auto;overflow:auto}
+#lector{width:100%;border-radius:16px;overflow:hidden;background:#000}
+#lector video{width:100%!important;border-radius:16px}
+.login{max-width:440px;margin:0 auto;width:100%;padding-top:3vh}
+.login h1{font-size:1.45rem}
 .tabs3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);border-radius:12px;padding:4px}
 .tabs3 button{font:inherit;font-size:.85rem;font-weight:500;min-height:40px;border:0;border-radius:9px;background:none;color:var(--muted);cursor:pointer}
 .tabs3 button[aria-selected="true"]{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.pass{position:relative}
+.pass button{position:absolute;right:6px;bottom:6px;min-height:34px;padding:4px 10px;font:inherit;font-size:.8rem;border:0;border-radius:8px;background:var(--accent-soft);color:var(--accent);cursor:pointer}
 .tbl{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:.85rem}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -113,17 +147,25 @@ th{font-size:.72rem;text-transform:uppercase;color:var(--muted)}
 <body>
 <div class="wrap" id="app"><div class="cargando">Cargando…</div></div>
 <nav class="bar" id="bar" hidden><div id="barin"></div></nav>
+<div id="cam" hidden>
+  <div class="camtop"><b>Apunta al código QR</b><button class="btn sm" data-a="cerrarcam">Cerrar</button></div>
+  <div class="cuerpo">
+    <div id="lector"></div>
+    <form id="f-scan" class="row"><input id="qrin" class="grow" placeholder="O escribe el código: QR-…" autocapitalize="characters" spellcheck="false" aria-label="Código QR"><button class="btn pri" type="submit">Buscar</button></form>
+  </div>
+</div>
 <div id="toast" hidden role="status" aria-live="polite"></div>
 
 <script>
 /* ===================== CONFIGURACIÓN ===================== */
-// Pega aquí la URL de tu aplicación web de Apps Script (termina en /exec)
+// URL de la aplicación web de Apps Script (termina en /exec)
 const API_URL = 'https://script.google.com/macros/s/AKfycbxW_SUxXac2-4rzW6YwGE_CDK0a6Clm9JqKHfpRwqQZhOpyqftlCiDN186-Y6kALiMeZw/exec';
 const ESCUELA = 'Escuela Primaria Profesor Gerardo Guadalupe Leal Leal';
 /* ========================================================= */
 
 const GRUPOS=['1°A','1°B','2°A','2°B','3°A','3°B','4°A','4°B','5°A','5°B','6°A','6°B'];
 const PARENTESCOS=['Mamá','Papá','Abuela','Abuelo','Tía','Tío','Hermano(a) mayor de edad','Padrastro','Madrastra','Otro'];
+const MOTIVOS=['Cita médica','Se sintió mal','Asunto familiar','Otro'];
 
 /* ---------- Íconos ---------- */
 const svg=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -137,6 +179,9 @@ const I={
   clock:svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>'),
   user:svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>'),
   key:svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>'),
+  bus:svg('<rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 11h16M8 17v3M16 17v3"/><circle cx="8" cy="14" r=".6"/><circle cx="16" cy="14" r=".6"/>'),
+  check:svg('<path d="M5 12.5l4.5 4.5L19 7"/>'),
+  person:svg('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-1a7 7 0 0114 0v1"/>'),
   chev:'<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
   back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>'
 };
@@ -146,13 +191,17 @@ const $=id=>document.getElementById(id);
 const val=id=>($(id)?$(id).value:'').trim();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ini=n=>String(n||'').split(' ').filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
+const nom1=n=>String(n||'').split(' ')[0];
 const av=(n,foto,c='')=>foto?`<img class="av ${c}" src="${foto}" alt="Foto de ${esc(n)}">`:`<div class="av ${c}" aria-hidden="true">${esc(ini(n))}</div>`;
 const guardar=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const leer=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
 const tok=()=>ses&&ses.token;
-const fechaBonita=f=>{if(!f)return'';const[y,m,d]=f.split('-');const hoy=new Date();const iso=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');return f===iso?'Hoy':`${+d}/${+m}/${y}`};
+const hoyISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fechaBonita=f=>{if(!f)return'';if(f===hoyISO())return'Hoy';const[y,m,d]=f.split('-');return`${+d}/${+m}/${y}`};
 function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,4000)}
 const qrUrl=c=>location.origin+location.pathname+'?qr='+encodeURIComponent(c);
+const pillTipo=t=>t==='Temprana'?'<span class="pill warn">Temprana</span>':t==='Transporte'?`<span class="pill">${I.bus}Transporte</span>`:'';
+const textoSalida=s=>s.tipo==='Transporte'?`Subió al ${esc(s.recogio).replace('Transporte','transporte')}`:`Con ${esc(s.recogio)}${s.parentesco?' ('+esc(s.parentesco)+')':''}`;
 
 async function api(fn,...args){
   if(!/^https:\/\/script\.google\.com\//.test(API_URL))throw new Error('Falta configurar API_URL en index.html.');
@@ -160,7 +209,14 @@ async function api(fn,...args){
   try{r=await fetch(API_URL,{method:'POST',body:JSON.stringify({fn,args})})}
   catch(e){throw new Error('Sin conexión. Revisa tu internet e intenta de nuevo.')}
   let j;try{j=await r.json()}catch(e){throw new Error('El servidor no respondió bien. Intenta de nuevo.')}
-  if(!j.ok){if(/sesión terminó/.test(j.error)){cerrarSesion(true)}throw new Error(j.error)}
+  return respuesta(j);
+}
+function respuesta(j){
+  if(!j.ok){
+    if(/sesión terminó/.test(j.error))cerrarSesion(true);
+    if(j.error==='Acción no válida.')throw new Error('Falta actualizar el servidor en Google Drive (pasos en el README de GitHub).');
+    throw new Error(j.error);
+  }
   return j.data;
 }
 async function hacer(btn,fn){
@@ -172,81 +228,109 @@ function leerFoto(file){return new Promise((ok,mal)=>{const r=new FileReader();r
 
 /* ---------- Estado ---------- */
 let ses=leer('sesion');
-let tab='', sub=null, D={}, confirmar=null, lector=null;
+let tab='', pila=[], D={}, confirmar=null, lector=null, E=null, alCerrar=null;
 let grupoSel=leer('grupoSel')||'1°A';
 let rolLogin=leer('ultimoRol')||'padre';
+let filtro='todos', hoyFiltro='mio', permDur='siempre';
 const params=new URLSearchParams(location.search);
-let scan={code:(params.get('qr')||'').toUpperCase(),res:null,hecho:null};
-if(scan.code){history.replaceState(null,'',location.pathname);if(!ses)rolLogin='maestro'}
+let qrPendiente=(params.get('qr')||'').toUpperCase();
+if(qrPendiente){history.replaceState(null,'',location.pathname);if(!ses)rolLogin='maestro'}
 const app=$('app');
+const sub=()=>pila[pila.length-1]||null;
 
 const TABS={
   padre:[['hijos','Mis hijos',I.qr],['personas','Autorizados',I.people],['historial','Historial',I.clock],['cuenta','Cuenta',I.user]],
-  maestro:[['escanear','Escanear',I.scan],['grupo','Mi grupo',I.list],['permisos','Permisos',I.key],['hoy','Hoy',I.clock]],
+  maestro:[['salidas','Salidas',I.scan],['permisos','Permisos',I.key],['hoy','Hoy',I.clock]],
   dir:[['inicio','Inicio',I.home],['alumnos','Alumnos',I.list],['escanear','Escanear',I.scan],['maestros','Maestros',I.people],['mas','Más',I.more]]
 };
 
-function cerrarSesion(silencio){cerrarCamara();scan={code:'',res:null,hecho:null};if(ses)api('salir',ses.token).catch(()=>{});ses=null;guardar('sesion',null);tab='';sub=null;D={};render();if(!silencio)toast('Sesión cerrada.')}
+function cerrarSesion(silencio){cerrarCamara();if(ses)api('salir',ses.token).catch(()=>{});ses=null;guardar('sesion',null);tab='';pila=[];D={};E=null;render();if(!silencio)toast('Sesión cerrada.')}
 
 /* ---------- Navegación ---------- */
-async function ir(t){await cerrarCamara();tab=t;sub=null;confirmar=null;render();window.scrollTo(0,0);await cargar()}
-function abrir(s){sub=s;confirmar=null;history.pushState({sub:1},'');render();window.scrollTo(0,0);cargarSub()}
-function cerrarSub(){if(sub){sub=null;confirmar=null;render();cargar()}}
-window.addEventListener('popstate',()=>{if(sub)cerrarSub()});
-function atras(){if(history.state&&history.state.sub)history.back();else cerrarSub()}
+async function ir(t){await cerrarCamara();tab=t;pila=[];E=null;confirmar=null;render();window.scrollTo(0,0);await cargar()}
+function abrir(s){confirmar=null;pila.push(s);history.pushState({sub:pila.length},'');render();window.scrollTo(0,0);cargarSub()}
+async function cerrarSub(){
+  if(!pila.length)return;
+  const s=pila.pop();if(s.t==='entrega')E=null;confirmar=null;render();
+  if(pila.length)await cargarSub();else await cargar();
+  const f=alCerrar;alCerrar=null;if(f)f();
+}
+window.addEventListener('popstate',()=>{if(!$('cam').hidden){cerrarCamara();return}if(pila.length)cerrarSub()});
+function atras(fn){alCerrar=fn||null;if(history.state&&history.state.sub)history.back();else cerrarSub()}
 
 async function cargar(){
   if(!ses)return;
   try{
     const r=ses.rol;
     if(r==='padre')D.padre=await api('datosPadre',tok());
-    if(r==='maestro'&&tab!=='escanear')D.maestro=await api('datosMaestro',tok());
+    if(r==='maestro')D.maestro=await api('datosMaestro',tok());
     if(r==='dir'){
-      if(tab==='inicio')D.resumen=await api('resumenDir',tok());
+      if(tab==='inicio'||tab==='mas')D.resumen=await api('resumenDir',tok());
       if(tab==='alumnos'&&!D.busqueda)D.lista=await api('listaGrupo',tok(),grupoSel);
       if(tab==='maestros')D.maestros=await api('listaMaestros',tok());
     }
   }catch(e){toast(e.message);return}
-  if(!sub)render();
+  if(!pila.length)render();
+  if(qrPendiente&&ses&&ses.rol!=='padre'){const q=qrPendiente;qrPendiente='';abrirEntrega({qr:q})}
 }
 async function cargarSub(){
+  const s=sub();if(!s)return;
   try{
-    if(sub.t==='ficha')D.ficha=await api('fichaAlumno',tok(),sub.id);
-    if(sub.t==='maestro'&&!D.maestros)D.maestros=await api('listaMaestros',tok());
+    if(s.t==='entrega'&&E&&!E.res){const r=E.o.qr?await api('buscarQR',tok(),E.o.qr):await api('abrirAlumno',tok(),E.o.id);iniciarEntrega(r)}
+    if(s.t==='ficha')D.ficha=await api('fichaAlumno',tok(),s.id);
+    if(s.t==='maestro'&&!D.maestros)D.maestros=await api('listaMaestros',tok());
+    if(s.t==='transporte')D.trans=await api('transporteDir',tok());
+    if(s.t==='permisosDir')D.perm=await api('listaPermisos',tok());
+    if(s.t==='horario'&&!D.resumen)D.resumen=await api('resumenDir',tok());
   }catch(e){toast(e.message);return}
-  render();
+  if(sub()===s)render();
 }
 
 /* ---------- Render ---------- */
 function render(){
   const bar=$('bar');
   if(!ses){bar.hidden=true;document.body.classList.add('sinbarra');app.innerHTML=vLogin();return}
-  if(!tab)tab=scan.code&&ses.rol!=='padre'?'escanear':TABS[ses.rol][0][0];
-  bar.hidden=!!sub;document.body.classList.toggle('sinbarra',!!sub);
+  if(!tab)tab=TABS[ses.rol][0][0];
+  const s=sub();
+  bar.hidden=!!s;document.body.classList.toggle('sinbarra',!!s);
   $('barin').innerHTML=TABS[ses.rol].map(([k,l,ic])=>`<button data-tab="${k}" ${tab===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('');
   let h='';
-  if(sub){h=`<button class="back" data-a="atras">${I.back} Atrás</button>`+(SUB[sub.t]?SUB[sub.t]():'')}
+  if(s){h=`<button class="back" data-a="atras">${I.back} Atrás</button>`+(SUB[s.t]?SUB[s.t](s):'')}
   else{
-    h=`<header class="top"><h1>${esc(TABS[ses.rol].find(x=>x[0]===tab)[1])}<small>${esc(ses.nombre)}</small></h1><button class="btn sm" data-a="salir">Salir</button></header>`;
-    h+=(V[ses.rol+'_'+tab]||V['c_'+tab]||(()=>''))();
+    const titulo=TABS[ses.rol].find(x=>x[0]===tab)[1];
+    h=`<header class="top"><h1>${esc(titulo)}<small>${esc(ses.nombre)}</small></h1><button class="btn sm" data-a="salir">Salir</button></header>`;
+    h+=(V[ses.rol+'_'+tab]||(()=>''))();
   }
   app.innerHTML=h;
   app.querySelectorAll('.qr[data-code]').forEach(el=>{try{new QRCode(el,{text:qrUrl(el.dataset.code),width:200,height:200,colorDark:'#17232b',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M})}catch(e){el.textContent=el.dataset.code}});
-  if(tab==='escanear'&&!sub&&scan.code&&!scan.res&&!scan.buscando)buscar(scan.code);
 }
 const cargando='<div class="cargando">Cargando…</div>';
-const listaSalidas=(rows,vacio)=>rows.length?`<div class="list">${rows.map(e=>`<div class="salida"><span><span class="h">${esc(fechaBonita(e.fecha))} · ${esc(e.hora)}</span> · ${esc(e.alumno)} <span class="pill">${esc(e.grupo)}</span></span><span class="muted">Recogió ${esc(e.recogio)} (${esc(e.parentesco)}) · Entregó ${esc(e.entrego)}</span></div>`).join('')}</div>`:`<p class="muted">${vacio}</p>`;
+const listaSalidas=(rows,vacio)=>rows.length?`<div class="list">${rows.map(e=>`<div class="salida"><span><span class="h">${esc(fechaBonita(e.fecha))} · ${esc(e.hora)}</span> · ${esc(e.alumno)} <span class="pill gris">${esc(e.grupo)}</span> ${pillTipo(e.tipo)}</span><span class="muted">${textoSalida(e)} · Entregó ${esc(e.entrego)}${e.motivo?' · Motivo: '+esc(e.motivo):''}</span></div>`).join('')}</div>`:`<p class="muted">${vacio}</p>`;
+const botonConfirmar=(k,etiqueta,accion,attrs,texto,clase='btn full')=>confirmar===k
+  ?`<div class="confirm">${texto}<div class="row"><button class="btn warn grow" data-a="${accion}" ${attrs}>Confirmar</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`
+  :`<button class="${clase}" data-a="pedir" data-k="${esc(k)}">${etiqueta}</button>`;
 
 function vLogin(){
+  const u=esc(leer('usuario_'+rolLogin)||'');
   const campos={
-    padre:`<label class="f" for="lu">CURP de tu hijo(a) mayor<input id="lu" autocomplete="username" autocapitalize="characters" maxlength="18" spellcheck="false"></label><label class="f" for="lp">PIN<input id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6"></label>`,
-    maestro:`<label class="f" for="lu">Usuario<input id="lu" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"></label>`,
-    dir:`<label class="f" for="lu">Usuario<input id="lu" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"></label>`}[rolLogin];
+    padre:`<label class="f" for="lu">CURP de tu hijo(a) mayor<input id="lu" value="${u}" autocomplete="username" autocapitalize="characters" maxlength="18" spellcheck="false"></label><label class="f pass" for="lp">PIN<input id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6"><button type="button" data-a="verpass">Ver</button></label>`,
+    maestro:`<label class="f" for="lu">Usuario<input id="lu" value="${u}" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f pass" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"><button type="button" data-a="verpass">Ver</button></label>`,
+    dir:`<label class="f" for="lu">Usuario<input id="lu" value="${u}" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f pass" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"><button type="button" data-a="verpass">Ver</button></label>`}[rolLogin];
   return `<div class="login card"><h3>Control de salidas</h3><h1>${esc(ESCUELA)}</h1>
-  ${scan.code?`<span class="pill" style="align-self:flex-start">Código escaneado: entra como maestro</span>`:''}
+  ${qrPendiente?`<span class="pill" style="align-self:flex-start">Código escaneado: entra como maestro</span>`:''}
   <div class="tabs3" role="tablist">${[['padre','Padres'],['maestro','Maestros'],['dir','Dirección']].map(([k,l])=>`<button role="tab" aria-selected="${rolLogin===k}" data-lr="${k}">${l}</button>`).join('')}</div>
   <form id="f-login" class="form">${campos}<button class="btn pri big full" type="submit">Entrar</button></form>
-  <p class="muted">¿Olvidaste tu PIN o contraseña? Pídelo en la dirección de la escuela.</p></div>`;
+  <p class="muted">La sesión queda abierta 30 días en este teléfono. ¿Olvidaste tu PIN o contraseña? Pídelo en la dirección.</p></div>`;
+}
+
+/* ===== Filas de alumnos (maestro) ===== */
+function filaAlumno(a,conGrupo){
+  let estado;
+  if(a.salida)estado=`<span class="pill ${a.salida.tipo==='Temprana'?'warn':'ok'}">${a.salida.tipo==='Transporte'?I.bus:''}${esc(a.salida.hora)}</span>`;
+  else if(a.transporte)estado=`<span class="pill">${I.bus}${esc(a.transporte)}</span>`;
+  else estado='<span class="pill gris">En escuela</span>';
+  const s=a.salida?textoSalida(a.salida):(conGrupo?`${esc(a.grupo)}`:'');
+  return `<button class="item" data-a="entrega" data-id="${a.id}">${conGrupo?`<span class="av gr" aria-hidden="true">${esc(a.grupo)}</span>`:av(a.nombre)}<span class="grow"><b>${esc(a.nombre)}</b>${s?`<span class="s">${s}</span>`:''}</span>${estado}</button>`;
 }
 
 const V={
@@ -254,16 +338,16 @@ const V={
 padre_hijos(){
   const d=D.padre;if(!d)return cargando;
   if(!d.hijos.length)return '<p class="muted">No hay alumnos activos en tu cuenta.</p>';
-  return d.hijos.map(s=>`<section class="card"><div><h2>${esc(s.nombre)}</h2><span class="muted">${esc(s.grupo)} · ${esc(s.maestro)}</span></div>
+  return d.hijos.map(s=>`<section class="card"><div class="row"><div class="grow"><h2>${esc(s.nombre)}</h2><span class="muted">${esc(s.grupo)} · ${esc(s.maestro)}</span></div>${s.transporte?`<span class="pill">${I.bus}${esc(s.transporte)}</span>`:''}</div>
+    ${s.hoy?`<p class="pill ok" style="align-self:flex-start;white-space:normal">Hoy salió ${esc(s.hoy.hora)} · ${textoSalida(s.hoy)}</p>`:''}
     <div class="qrwrap"><div class="qr" data-code="${esc(s.qr)}"></div><span class="code muted">${esc(s.qr)}</span>
     <p class="muted">Toma captura, imprímelo o pégalo en la credencial. Cualquier persona autorizada puede mostrarlo.</p></div>
-    ${confirmar==='qr'+s.id?`<div class="confirm">El código actual dejará de funcionar y tendrás que usar el nuevo.<div class="row"><button class="btn warn grow" data-a="nuevoqr" data-id="${s.id}">Sí, cambiarlo</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`
-    :`<button class="btn full" data-a="pedir" data-k="qr${s.id}">Cambiar código QR</button>`}</section>`).join('');
+    ${botonConfirmar('qr'+s.id,'Cambiar código QR','nuevoqr',`data-id="${s.id}"`,'El código actual dejará de funcionar y tendrás que usar el nuevo.')}</section>`).join('');
 },
 padre_personas(){
   const d=D.padre;if(!d)return cargando;
   return `<section class="card"><p class="muted">Pueden recoger a todos tus hijos. El maestro verá su foto al escanear.</p>
-  <div class="list">${d.personas.map(p=>`<div class="item" style="cursor:default">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
+  <div class="list">${d.personas.map(p=>`<div class="item">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
   ${confirmar==='p'+p.id?`<button class="btn warn sm" data-a="quitarp" data-id="${p.id}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="p${p.id}">Quitar</button>`}</div>`).join('')||'<p class="muted">Todavía no hay personas. Agrega al menos una.</p>'}</div></section>
   ${formPersona()}`;
 },
@@ -275,48 +359,56 @@ padre_cuenta(){
   <button class="btn pri full" type="submit">Guardar</button></form>
   <form class="card form" id="f-pin"><h2>Cambiar PIN</h2><label class="f" for="np">Nuevo PIN (4 a 6 números)<input id="np" type="password" inputmode="numeric" maxlength="6"></label><button class="btn pri full" type="submit">Guardar PIN</button></form>`;
 },
-/* ===== ESCANEAR (maestro y dirección) ===== */
-c_escanear(){
-  let h=`<section class="card"><div id="lector" hidden></div>
-  <button class="btn pri big full" data-a="camara" id="btncam">${I.scan} Abrir cámara</button>
-  <form id="f-scan" class="row"><input id="qrin" class="grow" placeholder="O escribe el código: QR-…" autocapitalize="characters" spellcheck="false" aria-label="Código QR"><button class="btn" type="submit">Buscar</button></form></section>`;
-  if(scan.hecho)h+=`<section class="card result"><h2>Salida registrada ${esc(scan.hecho.hora)}</h2><p>${esc(scan.hecho.alumno)} con ${esc(scan.hecho.persona)}. Correo al tutor: ${esc(scan.hecho.correo)}.</p><button class="btn pri big full" data-a="siguiente">${I.scan} Escanear siguiente</button></section>`;
-  const r=scan.res;
-  if(!r)return h+(scan.code&&!scan.hecho?cargando:'');
-  if(!r.valido)return h+`<section class="card result no"><h2>Código no válido</h2><p class="muted">Puede ser un QR que el padre ya cambió. Pide identificación y avisa a la dirección.</p></section>`;
-  const a=r.alumno,ok=r.permiso!=='no';
-  h+=`<section class="card result ${ok?'':'no'}"><div class="row">${av(a.nombre,a.foto,'lg')}<div class="grow"><h2>${esc(a.nombre)}</h2><span class="muted">${esc(a.grupo)} · ${esc(a.titular)}</span></div></div>
-  <span class="pill ${ok?'ok':'bad'}" style="align-self:flex-start">${{propio:'Tu grupo',autorizado:'Tienes permiso hoy',dir:'Dirección',no:'Sin permiso'}[r.permiso]}</span>`;
-  if(r.salida)h+=`<p><b>Ya salió hoy</b> a las ${esc(r.salida.hora)} con ${esc(r.salida.recogio)}.</p>`;
-  else if(!ok)h+=`<p>Este alumno es de ${esc(a.grupo)}. Pide a ${esc(a.titular)} que te dé permiso en su sección Permisos.</p>`;
-  else if(!r.personas.length)h+=`<p>Esta familia no tiene personas autorizadas registradas. Comunícate con la dirección.</p>`;
-  else h+=`<h3>¿Quién lo recoge?</h3><div class="pick">${r.personas.map((p,i)=>`<label for="pk${i}"><input type="radio" name="pk" id="pk${i}" value="${p.id}" data-n="${esc(p.nombre)}">${av(p.nombre,p.foto,'xl')}<span class="grow"><b>${esc(p.nombre)}</b><br><span class="muted">${esc(p.parentesco)}</span></span></label>`).join('')}</div>
-    <button class="btn pri big full" data-a="salida" data-id="${a.id}" data-n="${esc(a.nombre)}">Registrar salida</button>`;
-  return h+'</section>';
-},
 /* ===== MAESTRO ===== */
-maestro_grupo(){
-  const d=D.maestro;if(!d)return cargando;
-  const fuera=d.grupo.filter(s=>s.salio).length;
-  return `<div class="stats" style="grid-template-columns:repeat(2,1fr)"><div class="stat"><b>${d.grupo.length-fuera}</b><span>En la escuela</span></div><div class="stat"><b>${fuera}</b><span>Ya salieron</span></div></div>
-  <section class="card"><h2>${esc(d.yo.grupo)}</h2><div class="list">${d.grupo.map(s=>`<div class="item" style="cursor:default"><div class="grow"><b>${esc(s.nombre)}</b><span class="s code">${esc(s.qr)}</span></div>${s.salio?`<span class="pill ok">${esc(s.salio.split(' · ')[0])}</span>`:'<span class="pill">En escuela</span>'}</div>`).join('')||'<p class="muted">No hay alumnos en tu grupo.</p>'}</div>
-  <p class="muted">El código sirve para corroborar el QR que te muestran.</p></section>`;
+maestro_salidas(){
+  const d=D.maestro;if(!d)return `<button class="btn pri xl full" data-a="camara">${I.scan} Escanear código QR</button>`+cargando;
+  const g=d.grupo,fuera=g.filter(a=>a.salida),dentro=g.filter(a=>!a.salida),trans=g.filter(a=>a.transporte),transPend=trans.filter(a=>!a.salida);
+  const lista=filtro==='dentro'?dentro:filtro==='fuera'?fuera:g;
+  let h=`<button class="btn pri xl full" data-a="camara">${I.scan} Escanear código QR</button>
+  <div class="stats" ${trans.length?'':'style="grid-template-columns:repeat(2,1fr)"'}><div class="stat"><b>${dentro.length}</b><span>En la escuela</span></div><div class="stat"><b>${fuera.length}</b><span>Ya salieron</span></div>${trans.length?`<div class="stat"><b>${trans.length-transPend.length}/${trans.length}</b><span>Transporte</span></div>`:''}</div>`;
+  if(d.temprana)h+=`<p class="nota">Antes de las <b>${esc(d.horaSalida)}</b> la salida cuenta como <b>temprana</b> y se pide el motivo.</p>`;
+  if(transPend.length){
+    const rutas={};transPend.forEach(a=>(rutas[a.transporte]=rutas[a.transporte]||[]).push(nom1(a.nombre)));
+    h+=`<section class="card"><div class="row"><h2 class="grow">Transporte</h2><span class="pill">${I.bus}${transPend.length} por entregar</span></div>
+    <p class="muted">${Object.keys(rutas).sort().map(r=>`<b>${esc(r)}:</b> ${esc(rutas[r].join(', '))}`).join(' · ')}</p>
+    ${botonConfirmar('trans',`${I.bus} Entregar ${transPend.length} al transporte`,'transporte',`data-ids="${transPend.map(a=>a.id).join(',')}"`,'Se registrará que subieron al transporte y se avisará a sus familias.','btn pri full')}</section>`;
+  }
+  h+=`<div class="chips" role="group" aria-label="Filtrar">${[['todos','Todos',g.length],['dentro','En la escuela',dentro.length],['fuera','Salieron',fuera.length]].map(([k,l,n])=>`<button aria-pressed="${filtro===k}" data-a="filtro" data-val="${k}">${l} · ${n}</button>`).join('')}</div>
+  <section class="card"><div class="row"><h2 class="grow">${esc(d.yo.grupo)}</h2><span class="muted">Toca a un alumno para darle salida</span></div>
+  <div class="list">${lista.map(a=>filaAlumno(a)).join('')||'<p class="muted">No hay alumnos aquí.</p>'}</div></section>`;
+  if(d.extras.length)h+=`<section class="card"><h3>Hermanos que también entregas</h3><div class="list">${d.extras.map(a=>filaAlumno(a,true)).join('')}</div></section>`;
+  return h;
 },
 maestro_permisos(){
   const d=D.maestro;if(!d)return cargando;
-  return `<form class="card form" id="f-permiso"><h2>Que otro maestro entregue a ${esc(d.yo.grupo)}</h2><p class="muted">El permiso dura solo hoy.</p>
+  const descr=p=>p.alumno?esc(p.alumno):'Todo el grupo '+esc(p.grupo);
+  return `<section class="card"><h2>Hermanos en otros grupos</h2>
+  <p class="muted">Si siempre salen juntos, deja que el maestro del hermano los entregue. Es permanente hasta que lo quites.</p>
+  <div class="list">${d.hermanos.map(h=>`<div class="item"><div class="grow"><b>${esc(h.alumno.nombre)}</b><span class="s">Su hermano(a) ${esc(nom1(h.hermano.nombre))} está en ${esc(h.hermano.grupo)} con ${esc(h.maestro.nombre)}</span></div>
+    ${h.clave?(confirmar==='q'+h.clave?`<button class="btn warn sm" data-a="quitarpermiso" data-id="${esc(h.clave)}">Quitar</button>`:`<button class="btn sm" data-a="pedir" data-k="q${esc(h.clave)}"><span class="pill ok">Permanente</span></button>`)
+      :`<button class="btn pri sm" data-a="permitirhermano" data-m="${h.maestro.id}" data-id="${h.alumno.id}">Permitir a ${esc(nom1(h.maestro.nombre))}</button>`}</div>`).join('')||'<p class="muted">Ningún alumno de tu grupo tiene hermanos en otros grupos.</p>'}</div>
+  ${d.hermanos.some(h=>h.clave)?'<p class="muted">Toca <b>Permanente</b> para quitar el permiso.</p>':''}</section>
+  <form class="card form" id="f-permiso"><h2>Dar permiso a otro maestro</h2>
   <label class="f" for="gt">Maestro<select id="gt">${d.maestros.map(t=>`<option value="${t.id}">${esc(t.nombre)} · ${esc(t.grupo)}</option>`).join('')}</select></label>
-  <button class="btn pri full" type="submit">Dar permiso por hoy</button>
-  ${d.dados.map(g=>`<div class="item" style="cursor:default"><div class="grow"><b>${esc(g.nombre)}</b><span class="s">Puede entregar a tu grupo hoy</span></div><button class="btn warn sm" type="button" data-a="quitarpermiso" data-id="${g.id}">Quitar</button></div>`).join('')}</form>
-  <section class="card"><h3>Te dieron permiso hoy</h3>${d.recibidos.length?d.recibidos.map(g=>`<div class="item" style="cursor:default"><div class="grow"><b>${esc(g.grupo)}</b><span class="s">De ${esc(g.de)}</span></div></div>`).join(''):'<p class="muted">Ninguno.</p>'}</section>`;
+  <label class="f" for="ga">¿A quién puede entregar?<select id="ga"><option value="">Todo mi grupo (${esc(d.yo.grupo)})</option>${d.alumnosGrupo.map(a=>`<option value="${a.id}">${esc(a.nombre)}</option>`).join('')}</select></label>
+  ${segDuracion()}
+  <button class="btn pri full" type="submit">Dar permiso</button></form>
+  <section class="card"><h3>Permisos que diste</h3>${d.dados.length?`<div class="list">${d.dados.map(p=>filaPermiso(p,`${esc(p.maestro)} <span class="muted">(${esc(p.maestroGrupo)})</span>`,descr(p))).join('')}</div>`:'<p class="muted">Ninguno.</p>'}</section>
+  <section class="card"><h3>Permisos que tienes</h3>${d.recibidos.length?`<div class="list">${d.recibidos.map(p=>filaPermiso(p,descr(p),'De '+esc(p.titular))).join('')}</div>`:'<p class="muted">Ninguno.</p>'}</section>`;
 },
-maestro_hoy(){const d=D.maestro;if(!d)return cargando;return `<section class="card"><h3>Toda la escuela</h3>${listaSalidas(d.salidas,'Todavía no hay salidas hoy.')}</section>`},
+maestro_hoy(){
+  const d=D.maestro;if(!d)return cargando;
+  const rows=hoyFiltro==='mio'?d.salidas.filter(s=>s.grupo===d.yo.grupo||s.entrego===d.yo.nombre):d.salidas;
+  return `<div class="chips">${[['mio','Mi grupo'],['todos','Toda la escuela']].map(([k,l])=>`<button aria-pressed="${hoyFiltro===k}" data-a="hoyfiltro" data-val="${k}">${l}</button>`).join('')}</div>
+  <section class="card">${listaSalidas(rows,'Todavía no hay salidas hoy.')}</section>`;
+},
 /* ===== DIRECCIÓN ===== */
 dir_inicio(){
   const d=D.resumen;if(!d)return cargando;
-  return `<div class="stats"><div class="stat"><b>${d.total}</b><span>Alumnos</span></div><div class="stat"><b>${d.salidasHoy}</b><span>Salidas hoy</span></div><div class="stat"><b>${d.maestros}</b><span>Maestros</span></div></div>
-  ${d.sinPersonas?`<section class="card" style="border-color:var(--mark)"><p><b>${d.sinPersonas} alumnos</b> no tienen personas autorizadas registradas. Agrégalas desde la ficha de cada alumno.</p></section>`:''}
-  <div class="row"><button class="btn pri grow" data-a="alta">+ Alumno</button><button class="btn grow" data-a="importar">Importar Excel</button></div>
+  return `<div class="stats"><div class="stat"><b>${d.total}</b><span>Alumnos</span></div><div class="stat"><b>${d.salidasHoy}</b><span>Salidas hoy</span></div><div class="stat"><b>${d.transporte.entregados}/${d.transporte.total}</b><span>Transporte</span></div></div>
+  ${d.sinPersonas?`<section class="card" style="border-color:var(--mark)"><p><b>${d.sinPersonas} alumnos</b> no tienen personas autorizadas. Agrégalas desde la ficha de cada alumno.</p></section>`:''}
+  <div class="acciones"><button class="btn pri" data-a="alta">+ Alumno</button><button class="btn" data-a="importar">Importar Excel</button><button class="btn" data-a="transporteDir">${I.bus} Transporte</button><button class="btn" data-a="permisosDir">${I.key} Permisos</button></div>
+  <p class="muted">Hora de salida: <b>${esc(d.horaSalida)}</b> · Tempranas hoy: <b>${d.tempranas}</b> · Permisos permanentes: <b>${d.permanentes}</b></p>
   <section class="card"><h3>Salidas de hoy por grupo</h3><div class="grupos">${d.grupos.map(g=>`<button data-a="vergrupo" data-g="${g}"><b>${g}</b><span>${d.conteo[g].salidas}/${d.conteo[g].alumnos}</span></button>`).join('')}</div></section>
   <section class="card"><h3>Últimas salidas</h3>${listaSalidas(d.ultimas,'Todavía no hay salidas hoy.')}</section>
   <p class="muted">Correos de aviso disponibles hoy: ${d.correosRestantes}</p>`;
@@ -327,16 +419,24 @@ dir_alumnos(){
   <button class="btn pri full" data-a="alta">+ Dar de alta alumno</button>
   <section class="card" id="listaAl">${D.busqueda?cargando:listaAlumnos(D.lista)}</section>`;
 },
+dir_escanear(){
+  return `<button class="btn pri xl full" data-a="camara">${I.scan} Escanear código QR</button>
+  <form id="f-scan2" class="card form"><label class="f" for="qrin2">O escribe el código<input id="qrin2" placeholder="QR-…" autocapitalize="characters" spellcheck="false"></label><button class="btn full" type="submit">Buscar</button></form>
+  <p class="muted">Para dar salida sin código QR (por ejemplo, salida temprana en la dirección), busca al alumno en <b>Alumnos</b> y toca <b>Dar salida</b>.</p>`;
+},
 dir_maestros(){
   const d=D.maestros;if(!d)return cargando;
   return `<button class="btn pri full" data-a="nuevomaestro">+ Agregar maestro</button>
-  <section class="card"><div class="list">${d.map(m=>`<button class="item" data-a="vermaestro" data-id="${m.id}"><span class="av" aria-hidden="true">${esc(m.grupo)}</span><span class="grow"><b>${esc(m.nombre)}</b><span class="s">Usuario ${esc(m.usuario)} · Contraseña ${esc(m.contrasena)}</span></span>${I.chev}</button>`).join('')||'<p class="muted">Todavía no hay maestros.</p>'}</div></section>`;
+  <section class="card"><div class="list">${d.map(m=>`<button class="item" data-a="vermaestro" data-id="${m.id}"><span class="av gr" aria-hidden="true">${esc(m.grupo)}</span><span class="grow"><b>${esc(m.nombre)}</b><span class="s">Usuario ${esc(m.usuario)} · Contraseña ${esc(m.contrasena)}</span></span>${I.chev}</button>`).join('')||'<p class="muted">Todavía no hay maestros.</p>'}</div></section>`;
 },
 dir_mas(){
   const item=(a,t,s)=>`<button class="item" data-a="${a}"><span class="grow"><b>${t}</b><span class="s">${s}</span></span>${I.chev}</button>`;
   return `<section class="card"><div class="list">
+  ${item('transporteDir','Transporte','Rutas, quién ya subió y entrega por ruta')}
+  ${item('permisosDir','Permisos entre maestros','Ver, dar y quitar permisos de hoy o permanentes')}
+  ${item('horario','Hora de salida','Antes de esa hora la salida cuenta como temprana')}
   ${item('importar','Importar alumnos desde Excel','Sube el archivo desde el teléfono o la computadora')}
-  ${item('reportes','Reportes de salidas','Por día, grupo o alumno; descarga en Excel')}
+  ${item('reportes','Reportes de salidas','Por día, grupo, alumno o tipo; descarga en Excel')}
   ${item('clave','Contraseña de dirección','Cámbiala periódicamente')}
   ${item('ciclo','Cerrar ciclo escolar','Sube a todos de grado y archiva el historial')}
   </div></section>
@@ -344,12 +444,19 @@ dir_mas(){
 }
 };
 
+function segDuracion(){
+  return `<div><h3 style="margin-bottom:6px">¿Por cuánto tiempo?</h3><div class="seg" role="group">${[['hoy','Solo hoy'],['siempre','Siempre']].map(([k,l])=>`<button type="button" aria-pressed="${permDur===k}" data-a="dur" data-val="${k}">${l}</button>`).join('')}</div>
+  <p class="muted" style="margin-top:6px">${permDur==='siempre'?'Queda activo hasta que alguien lo quite.':'Se quita solo al terminar el día.'}</p></div>`;
+}
+function filaPermiso(p,titulo,detalle){
+  return `<div class="item"><div class="grow"><b>${titulo}</b><span class="s">${detalle} · <span class="pill ${p.duracion==='siempre'?'ok':'gris'}">${p.duracion==='siempre'?'Permanente':'Solo hoy'}</span></span></div>
+  ${confirmar==='q'+p.clave?`<button class="btn warn sm" data-a="quitarpermiso" data-id="${esc(p.clave)}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="q${esc(p.clave)}">Quitar</button>`}</div>`;
+}
 function listaAlumnos(l){
   if(!l)return cargando;
   if(!l.length)return '<p class="muted">No hay alumnos aquí. Dalos de alta o impórtalos desde Excel.</p>';
-  return `<div class="list">${l.map(a=>`<button class="item" data-a="ficha" data-id="${a.id}"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${a.grupo?esc(a.grupo)+' · ':''}${a.tutor!==undefined?'Tutor: '+esc(a.tutor)+' · PIN '+esc(a.pin):(a.activo===false?'Dado de baja':'')}</span></span>${I.chev}</button>`).join('')}</div>`;
+  return `<div class="list">${l.map(a=>`<button class="item" data-a="ficha" data-id="${a.id}"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${a.grupo?esc(a.grupo)+' · ':''}${a.tutor!==undefined?'Tutor: '+esc(a.tutor)+' · PIN '+esc(a.pin):(a.activo===false?'Dado de baja':'')}</span></span>${a.transporte?`<span class="pill">${I.bus}${esc(a.transporte)}</span>`:''}${I.chev}</button>`).join('')}</div>`;
 }
-
 function formPersona(famId){
   return `<form class="card form" id="f-persona" ${famId?`data-fam="${esc(famId)}"`:''}><h3>Agregar persona autorizada</h3>
   <label class="f" for="pn">Nombre completo<input id="pn" required autocomplete="off"></label>
@@ -358,19 +465,74 @@ function formPersona(famId){
   <button class="btn pri full" type="submit">Agregar</button></form>`;
 }
 
-/* ===== Pantallas secundarias (dirección) ===== */
+/* ===== Entrega (escaneo o desde la lista) ===== */
+function abrirEntrega(o){
+  E={o,res:null,persona:'',transporte:false,hermanos:{},motivo:'',hecho:null,via:o.qr?'QR':'Lista'};
+  if(sub()&&sub().t==='entrega'){render();cargarSub()}else abrir({t:'entrega'});
+}
+function iniciarEntrega(r){
+  E.res=r;if(!r.valido)return;
+  E.transporte=!!r.alumno.transporte&&!r.salida;
+  E.persona=r.personas.length===1?r.personas[0].id:'';
+  E.hermanos={};
+  r.hermanos.forEach(h=>{if(h.permiso!=='no'&&!h.salida)E.hermanos[h.id]=['siempre','propio','dir'].indexOf(h.permiso)>=0});
+}
+const etiquetaPermiso={propio:'Tu grupo',hoy:'Permiso de hoy',siempre:'Permiso permanente',dir:'Dirección',no:'Sin permiso'};
+function hermanosElegibles(){return E.res.hermanos.filter(h=>h.permiso!=='no'&&!h.salida&&(!E.transporte||h.transporte))}
+function botonRegistrar(){
+  const n=1+hermanosElegibles().filter(h=>E.hermanos[h.id]).length;
+  return E.transporte?`${I.bus} Entregar al transporte${n>1?' ('+n+' alumnos)':''}`:`Registrar salida${n>1?' de '+n+' alumnos':''}`;
+}
 const SUB={
-ficha(){
-  const d=D.ficha;if(!d||d.alumno.id!==sub.id)return cargando;
+entrega(){
+  if(!E||!E.res)return cargando;
+  const r=E.res;
+  if(!r.valido)return `<section class="card result no"><h2>Código no válido</h2><p class="muted">Puede ser un código QR que la familia ya cambió. Pide identificación y avisa a la dirección.</p></section><button class="btn pri big full" data-a="siguiente">${I.scan} Escanear otro</button>`;
+  if(E.hecho)return vHecho();
+  const a=r.alumno,ok=r.permiso!=='no';
+  let h=`<section class="card result ${ok?'':'no'}"><div class="row">${av(a.nombre,a.foto,'lg')}<div class="grow"><h1>${esc(a.nombre)}</h1><span class="muted">${esc(a.grupo)} · ${esc(a.titular)}</span></div></div>
+  <div class="row"><span class="pill ${ok?'ok':'bad'}">${etiquetaPermiso[r.permiso]}</span>${a.transporte?`<span class="pill">${I.bus}${esc(a.transporte)}</span>`:''}${E.via==='Lista'?'<span class="pill gris">Sin QR</span>':''}</div></section>`;
+  if(r.salida){
+    h+=`<section class="card"><h2>Ya salió hoy a las ${esc(r.salida.hora)}</h2><p>${textoSalida(r.salida)} ${pillTipo(r.salida.tipo)}</p><p class="muted">Entregó ${esc(r.salida.entrego)}${r.salida.motivo?' · Motivo: '+esc(r.salida.motivo):''}</p>
+    ${r.puedeDeshacer?botonConfirmar('deshacer','Deshacer esta salida','deshacer',`data-ids="${a.id}"`,'Se anula la salida y la familia recibe un aviso de corrección. El alumno vuelve a aparecer en la escuela.','btn warn full'):''}</section>`;
+    return h;
+  }
+  if(!ok)return h+`<section class="card"><p>${esc(nom1(a.nombre))} es de ${esc(a.grupo)}. Para entregarlo, ${esc(a.titular)} debe darte permiso en su sección <b>Permisos</b> (solo hoy o siempre).</p></section>`;
+  if(E.via==='Lista'&&!E.transporte)h+=`<p class="nota">Sin código QR: verifica la identificación de quien recoge.</p>`;
+  if(a.transporte)h+=`<div class="seg" role="group" aria-label="Cómo se va">${[['persona','Lo recogen',I.person],['transporte','Transporte · '+a.transporte,I.bus]].map(([k,l,ic])=>`<button aria-pressed="${(k==='transporte')===E.transporte}" data-a="modo" data-val="${k}">${ic}${esc(l)}</button>`).join('')}</div>`;
+  if(!E.transporte){
+    h+=r.personas.length?`<section class="card"><h3>¿Quién lo recoge?</h3><div class="pick">${r.personas.map((p,i)=>`<label for="pk${i}"><input type="radio" name="pk" id="pk${i}" value="${p.id}" ${E.persona===p.id?'checked':''}>${av(p.nombre,p.foto,'xl')}<span class="grow"><b>${esc(p.nombre)}</b><br><span class="muted">${esc(p.parentesco)}</span></span></label>`).join('')}</div></section>`
+      :`<section class="card result no"><p>Esta familia no tiene personas autorizadas registradas. Comunícate con la dirección.</p></section>`;
+  }
+  if(r.hermanos.length){
+    h+=`<section class="card"><h3>Hermanos</h3><div class="pick">${r.hermanos.map(x=>{
+      if(x.salida)return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">Ya salió ${esc(x.salida.hora)}</span></span></div>`;
+      if(x.permiso==='no')return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">Para entregarlo necesitas permiso de ${esc(x.titular)}</span></span></div>`;
+      if(E.transporte&&!x.transporte)return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">No usa transporte</span></span></div>`;
+      return `<label class="chk" for="hm${x.id}"><input type="checkbox" id="hm${x.id}" data-h="${x.id}" ${E.hermanos[x.id]?'checked':''}><span class="grow"><b>También sale ${esc(x.nombre)}</b><br><span class="muted">${esc(x.grupo)} · ${etiquetaPermiso[x.permiso]}</span></span></label>`;
+    }).join('')}</div></section>`;
+  }
+  if(r.temprana&&!E.transporte){
+    h+=`<section class="card" style="border-color:var(--mark)"><h2>Salida temprana</h2><p class="muted">Es antes de las ${esc(r.horaSalida)}. Elige el motivo:</p>
+    <div class="chips envolver">${MOTIVOS.map(m=>`<button aria-pressed="${E.motivo===m}" data-a="motivo" data-val="${esc(m)}">${esc(m)}</button>`).join('')}</div>
+    ${E.motivo==='Otro'?`<label class="f" for="motivoOtro">¿Cuál?<input id="motivoOtro" autocomplete="off"></label>`:''}</section>`;
+  }
+  return h+`<button class="btn pri big full" data-a="registrar" data-id="${a.id}" id="btnreg" ${!E.transporte&&!r.personas.length?'disabled':''}>${botonRegistrar()}</button>`;
+},
+ficha(s){
+  const d=D.ficha;if(!d||d.alumno.id!==s.id)return cargando;
   const a=d.alumno,f=d.familia;
-  return `<section class="card"><div class="row">${av(a.nombre,a.foto,'xl')}<div class="grow"><h1>${esc(a.nombre)}</h1><span class="muted">${esc(a.grupo)}</span>${a.activo?'':' <span class="pill bad">Dado de baja</span>'}</div></div>
+  return `<section class="card"><div class="row">${av(a.nombre,a.foto,'xl')}<div class="grow"><h1>${esc(a.nombre)}</h1><span class="muted">${esc(a.grupo)}</span> ${a.transporte?`<span class="pill">${I.bus}${esc(a.transporte)}</span>`:''}${a.activo?'':' <span class="pill bad">Dado de baja</span>'}</div></div>
+  ${a.activo?`<button class="btn pri big full" data-a="entrega" data-id="${a.id}">Dar salida</button>`:''}
   <label class="btn full" for="fa">Cambiar foto del alumno<input id="fa" type="file" accept="image/*" hidden></label></section>
   <section class="card"><h3>Código QR</h3><div class="qrwrap"><div class="qr" data-code="${esc(a.qr)}"></div><span class="code muted">${esc(a.qr)}</span></div>
-  ${confirmar==='qr'?`<div class="confirm">El código actual dejará de funcionar.<div class="row"><button class="btn warn grow" data-a="nuevoqr" data-id="${a.id}">Sí, cambiarlo</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`:`<button class="btn full" data-a="pedir" data-k="qr">Cambiar código QR</button>`}</section>
+  ${botonConfirmar('qr','Cambiar código QR','nuevoqr',`data-id="${a.id}"`,'El código actual dejará de funcionar.')}</section>
   <form class="card form" id="f-alumno"><h3>Datos del alumno</h3>
   <label class="f" for="en">Nombre completo<input id="en" value="${esc(a.nombre)}"></label>
   <label class="f" for="ec">CURP<input id="ec" value="${esc(a.curp)}" maxlength="18" autocapitalize="characters"></label>
   <label class="f" for="eg">Grupo<select id="eg">${GRUPOS.map(g=>`<option ${g===a.grupo?'selected':''}>${g}</option>`).join('')}</select></label>
+  <label class="f" for="etr">Transporte escolar<input id="etr" list="rutas" value="${esc(a.transporte)}" placeholder="Vacío si no usa transporte (ej. Ruta 1)" autocomplete="off"></label>
+  <datalist id="rutas">${d.rutas.map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
   <button class="btn pri full" type="submit">Guardar cambios</button></form>
   <form class="card form" id="f-familia" data-id="${esc(f.id)}"><h3>Familia</h3>
   <label class="f" for="ft">Tutor<input id="ft" value="${esc(f.tutor)}"></label>
@@ -380,18 +542,22 @@ ficha(){
   <p class="muted">El padre entra con el CURP del hijo mayor inscrito y este PIN.</p>
   <div class="row"><button class="btn pri grow" type="submit">Guardar</button><button class="btn grow" type="button" data-a="pinnuevo" data-id="${esc(f.id)}">PIN al azar</button></div>
   ${d.hermanos.length?`<h3>Hermanos</h3><div class="list">${d.hermanos.map(h=>`<button class="item" type="button" data-a="ficha" data-id="${h.id}"><span class="grow"><b>${esc(h.nombre)}</b><span class="s">${esc(h.grupo)}</span></span>${I.chev}</button>`).join('')}</div>`:''}</form>
-  <section class="card"><h3>Personas autorizadas</h3><div class="list">${d.personas.map(p=>`<div class="item" style="cursor:default">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
+  <section class="card"><h3>Personas autorizadas</h3><div class="list">${d.personas.map(p=>`<div class="item">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
   ${confirmar==='p'+p.id?`<button class="btn warn sm" data-a="quitarp" data-id="${p.id}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="p${p.id}">Quitar</button>`}</div>`).join('')||'<p class="muted">Sin personas autorizadas. Agrégalas con los datos de la hoja de autorización.</p>'}</div></section>
   ${formPersona(f.id)}
+  <form class="card form" id="f-permalumno"><h3>Otros maestros que lo pueden entregar</h3>
+  ${d.permisos.length?`<div class="list">${d.permisos.map(p=>filaPermiso(p,esc(p.maestro)+` <span class="muted">(${esc(p.maestroGrupo)})</span>`,p.alumno?'Solo a este alumno':'Todo el grupo')).join('')}</div>`:'<p class="muted">Solo su maestro y la dirección.</p>'}
+  <label class="f" for="pm">Dar permiso a<select id="pm">${d.maestros.map(m=>`<option value="${m.id}">${esc(m.nombre)} · ${esc(m.grupo)}</option>`).join('')}</select></label>
+  ${segDuracion()}<button class="btn full" type="submit">Dar permiso para este alumno</button></form>
   <section class="card"><h3>Últimas salidas</h3>${listaSalidas(d.salidas,'Sin salidas registradas.')}</section>
-  ${confirmar==='baja'?`<div class="confirm">${a.activo?'El alumno dejará de aparecer en listas y su QR dejará de funcionar.':'El alumno volverá a estar activo.'}<div class="row"><button class="btn warn grow" data-a="baja" data-id="${a.id}" data-v="${a.activo?0:1}">Confirmar</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`
-  :`<button class="btn ${a.activo?'warn':''} full" data-a="pedir" data-k="baja">${a.activo?'Dar de baja':'Reactivar alumno'}</button>`}`;
+  ${botonConfirmar('baja',a.activo?'Dar de baja':'Reactivar alumno','baja',`data-id="${a.id}" data-val="${a.activo?0:1}"`,a.activo?'El alumno dejará de aparecer en listas y su QR dejará de funcionar.':'El alumno volverá a estar activo.',`btn ${a.activo?'warn':''} full`)}`;
 },
 alta(){
   return `<h1>Dar de alta alumno</h1><form class="card form" id="f-alta">
   <label class="f" for="an">Nombre completo<input id="an" required autocomplete="off"></label>
   <label class="f" for="ac">CURP<input id="ac" maxlength="18" required autocapitalize="characters" spellcheck="false"></label>
   <label class="f" for="ag">Grupo<select id="ag">${GRUPOS.map(g=>`<option ${g===grupoSel?'selected':''}>${g}</option>`).join('')}</select></label>
+  <label class="f" for="atr">Transporte escolar<input id="atr" placeholder="Vacío si no usa transporte (ej. Ruta 1)" autocomplete="off"></label>
   <h3>¿Tiene hermanos inscritos?</h3>
   <input type="hidden" id="ah"><div id="ahsel"></div>
   <label class="f" for="ahq">Buscar hermano (déjalo vacío si es familia nueva)<input id="ahq" type="search" autocomplete="off" placeholder="Nombre del hermano"></label>
@@ -402,9 +568,9 @@ alta(){
   <label class="f" for="aw">Teléfono<input id="aw" type="tel" autocomplete="off"></label></div>
   <button class="btn pri big full" type="submit">Dar de alta</button></form>`;
 },
-maestro(){
-  const m=sub.id&&D.maestros?D.maestros.find(x=>x.id===sub.id):null;
-  if(sub.id&&!m)return cargando;
+maestro(s){
+  const m=s.id&&D.maestros?D.maestros.find(x=>x.id===s.id):null;
+  if(s.id&&!m)return cargando;
   const libres=GRUPOS.filter(g=>!(D.maestros||[]).some(x=>x.grupo===g&&(!m||x.id!==m.id)));
   return `<h1>${m?'Editar maestro':'Agregar maestro'}</h1><form class="card form" id="f-maestro" data-id="${m?esc(m.id):''}">
   <label class="f" for="mn">Nombre completo<input id="mn" required value="${esc(m?m.nombre:'')}"></label>
@@ -413,19 +579,45 @@ maestro(){
   <label class="f" for="mc">Contraseña<input id="mc" value="${esc(m?m.contrasena:'')}" placeholder="Déjala vacía para generar una"></label>
   <label class="f" for="me">Correo<input id="me" type="email" inputmode="email" value="${esc(m?m.correo:'')}"></label>
   <button class="btn pri big full" type="submit">Guardar</button></form>
-  ${m?(confirmar==='delm'?`<div class="confirm">${esc(m.nombre)} ya no podrá entrar.<div class="row"><button class="btn warn grow" data-a="delmaestro" data-id="${m.id}">Eliminar</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`:`<button class="btn warn full" data-a="pedir" data-k="delm">Eliminar maestro</button>`):''}`;
+  ${m?botonConfirmar('delm','Eliminar maestro','delmaestro',`data-id="${m.id}"`,esc(m.nombre)+' ya no podrá entrar.','btn warn full'):''}`;
+},
+transporte(){
+  const d=D.trans;if(!d)return cargando;
+  if(!d.length)return `<h1>Transporte</h1><section class="card"><p>Ningún alumno tiene transporte asignado.</p><p class="muted">Asígnalo en la ficha del alumno (campo <b>Transporte escolar</b>) o con la columna <b>Transporte</b> al importar el Excel.</p></section>`;
+  return `<h1>Transporte</h1>`+d.map(r=>{
+    const pend=r.alumnos.filter(a=>!a.salida);
+    return `<section class="card"><div class="row"><h2 class="grow">${I.bus.replace('<svg','<svg width="20" height="20" style="vertical-align:-4px"')} ${esc(r.ruta)}</h2><span class="pill ${pend.length?'':'ok'}">${r.alumnos.length-pend.length}/${r.alumnos.length} entregados</span></div>
+    <div class="list">${r.alumnos.map(a=>filaAlumno(a,true)).join('')}</div>
+    ${pend.length?botonConfirmar('tr'+r.ruta,`Entregar ${pend.length} pendientes de ${esc(r.ruta)}`,'transporte',`data-ids="${pend.map(a=>a.id).join(',')}"`,'Se registrará que subieron al transporte y se avisará a sus familias.','btn pri full'):''}</section>`;
+  }).join('');
+},
+permisosDir(){
+  const d=D.perm;if(!d)return cargando;
+  return `<h1>Permisos entre maestros</h1>
+  <form class="card form" id="f-permdir"><h3>Dar permiso</h3>
+  <label class="f" for="pdm">Maestro<select id="pdm">${d.maestros.map(m=>`<option value="${m.id}">${esc(m.nombre)} · ${esc(m.grupo)}</option>`).join('')}</select></label>
+  <label class="f" for="pdg">Puede entregar al grupo<select id="pdg">${GRUPOS.map(g=>`<option>${g}</option>`).join('')}</select></label>
+  ${segDuracion()}<button class="btn pri full" type="submit">Dar permiso</button>
+  <p class="muted">Para un solo alumno (por ejemplo, hermanos), abre su ficha en Alumnos.</p></form>
+  <section class="card"><h3>Permisos activos</h3>${d.permisos.length?`<div class="list">${d.permisos.map(p=>filaPermiso(p,esc(p.maestro)+` <span class="muted">(${esc(p.maestroGrupo)})</span>`,p.alumno?esc(p.alumno)+' · '+esc(p.grupo):'Todo '+esc(p.grupo))).join('')}</div>`:'<p class="muted">No hay permisos activos.</p>'}</section>`;
+},
+horario(){
+  const h=D.resumen?D.resumen.horaSalida:'';
+  return `<h1>Hora de salida</h1><form class="card form" id="f-horario"><p class="muted">Si un alumno sale antes de esta hora, se registra como <b>salida temprana</b> y se pide el motivo.</p>
+  <label class="f" for="hs">Hora normal de salida<input id="hs" type="time" value="${esc(h)}" required></label>
+  <button class="btn pri big full" type="submit">Guardar</button></form>`;
 },
 importar(){
   const p=D.imp;
   let h=`<h1>Importar alumnos</h1><section class="card"><p>Sube un Excel con una fila por alumno y estas columnas:</p>
-  <p class="muted"><b>Nombre</b>, <b>CURP</b>, <b>Grupo</b> (ej. 3A), Tutor, Teléfono, Correo, CURP hermano mayor.</p>
-  <p class="muted">Para hermanos: el mayor va sin hermano; los menores llevan el CURP del mayor en la última columna.</p>
+  <p class="muted"><b>Nombre</b>, <b>CURP</b>, <b>Grupo</b> (ej. 3A), Tutor, Teléfono, Correo, CURP hermano mayor, Transporte (ej. Ruta 1).</p>
+  <p class="muted">Para hermanos: el mayor va sin hermano; los menores llevan el CURP del mayor.</p>
   <button class="btn full" data-a="plantilla">Descargar plantilla de Excel</button>
   <label class="btn pri big full" for="xls">Elegir archivo de Excel<input id="xls" type="file" accept=".xlsx,.xls,.csv" hidden></label></section>`;
   if(p&&p.filas){
     h+=`<section class="card"><h2>${p.filas.length} alumnos encontrados</h2>${p.faltan?`<p class="pill bad" style="align-self:flex-start">No encontré la columna: ${esc(p.faltan)}</p>`:''}
-    <div class="tbl"><table><thead><tr><th>Nombre</th><th>CURP</th><th>Grupo</th><th>Hermano</th>${p.res?'<th>Resultado</th>':''}</tr></thead><tbody>
-    ${p.filas.map((r,i)=>`<tr><td>${esc(r.nombre)}</td><td class="code">${esc(r.curp)}</td><td>${esc(r.grupo)}</td><td class="code">${esc(r.curpHermano)}</td>${p.res?`<td>${p.res[i]?`<span class="pill ${p.res[i].ok?'ok':'bad'}">${esc(p.res[i].msg)}</span>`:'…'}</td>`:''}</tr>`).join('')}
+    <div class="tbl"><table><thead><tr><th>Nombre</th><th>CURP</th><th>Grupo</th><th>Hermano</th><th>Transporte</th>${p.res?'<th>Resultado</th>':''}</tr></thead><tbody>
+    ${p.filas.map((r,i)=>`<tr><td>${esc(r.nombre)}</td><td class="code">${esc(r.curp)}</td><td>${esc(r.grupo)}</td><td class="code">${esc(r.curpHermano)}</td><td>${esc(r.transporte)}</td>${p.res?`<td>${p.res[i]?`<span class="pill ${p.res[i].ok?'ok':'bad'}">${esc(p.res[i].msg)}</span>`:'…'}</td>`:''}</tr>`).join('')}
     </tbody></table></div>
     ${p.res?`<p><b>${p.res.filter(x=>x&&x.ok).length}</b> dados de alta · <b>${p.res.filter(x=>x&&!x.ok).length}</b> con error</p>`:`<button class="btn pri big full" data-a="subirimp" ${p.faltan?'disabled':''}>Importar ${p.filas.length} alumnos</button>`}</section>`;
   }
@@ -435,6 +627,7 @@ reportes(){
   const f=D.filtro||{};
   return `<h1>Reportes</h1><form class="card form" id="f-reporte">
   <label class="f" for="rg">Grupo<select id="rg"><option value="">Todos</option>${GRUPOS.map(g=>`<option ${f.grupo===g?'selected':''}>${g}</option>`).join('')}</select></label>
+  <label class="f" for="rt">Tipo de salida<select id="rt"><option value="">Todas</option>${['Normal','Temprana','Transporte'].map(t=>`<option ${f.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
   <label class="f" for="rn">Alumno<input id="rn" type="search" value="${esc(f.alumno||'')}" placeholder="Nombre (opcional)"></label>
   <div class="row"><label class="f grow" for="rd">Desde<input id="rd" type="date" value="${esc(f.desde||'')}"></label><label class="f grow" for="rh">Hasta<input id="rh" type="date" value="${esc(f.hasta||'')}"></label></div>
   <div class="row"><button class="btn pri grow" type="submit">Ver</button><button class="btn grow" type="button" data-a="excel">Descargar Excel</button></div></form>
@@ -447,39 +640,52 @@ clave(){
   <button class="btn pri big full" type="submit">Cambiar</button></form>`;
 },
 ciclo(){
-  return `<h1>Cerrar ciclo escolar</h1><section class="card"><p>Esto hace tres cosas:</p>
-  <p class="muted">1. Sube a todos los alumnos un grado (3°A pasa a 4°A).<br>2. Da de baja a los de 6° como egresados. Si tenían hermanos menores, la cuenta pasa al siguiente hermano.<br>3. Guarda el historial de salidas en otra pestaña de la hoja y empieza uno nuevo.</p>
+  return `<h1>Cerrar ciclo escolar</h1><section class="card"><p>Esto hace cuatro cosas:</p>
+  <p class="muted">1. Sube a todos los alumnos un grado (3°A pasa a 4°A).<br>2. Da de baja a los de 6° como egresados. Si tenían hermanos menores, la cuenta pasa al siguiente hermano.<br>3. Guarda el historial de salidas en otra pestaña de la hoja y empieza uno nuevo.<br>4. Quita todos los permisos entre maestros, porque cambian los grupos.</p>
   <p class="muted">Después revisa en Maestros que cada uno tenga su grupo nuevo.</p></section>
   <form class="card form" id="f-ciclo"><label class="f" for="cic">Escribe CERRAR para confirmar<input id="cic" autocapitalize="characters" autocomplete="off"></label>
   <button class="btn warn big full" type="submit">Cerrar ciclo</button></form>`;
 }
 };
 
-/* ---------- Escáner ---------- */
+function vHecho(){
+  const x=E.hecho;
+  const nombres=x.alumnos.map(nom1);
+  const lista=nombres.length>1?nombres.slice(0,-1).join(', ')+' y '+nombres.slice(-1):nombres[0];
+  return `<section class="card hecho"><div class="check">${I.check}</div><h1>${x.tipo==='Transporte'?'Entregado al transporte':'Salida registrada'}</h1>
+  <div class="horag">${esc(x.hora)}</div>
+  <p>${esc(lista)} · ${x.tipo==='Transporte'?esc(x.recogio):'con '+esc(x.recogio)} ${pillTipo(x.tipo)}</p>
+  <p class="muted">Correo a la familia: ${esc(x.correo)}</p></section>
+  <button class="btn pri xl full" data-a="siguiente">${I.scan} Escanear siguiente</button>
+  <button class="btn big full" data-a="atras">${ses.rol==='maestro'?'Volver a mi grupo':'Listo'}</button>
+  ${botonConfirmar('deshacer','Me equivoqué: deshacer','deshacer',`data-ids="${x.ids.join(',')}"`,'Se anula la salida y la familia recibe un aviso de corrección.','btn warn full')}`;
+}
+
+/* ---------- Escáner (pantalla completa) ---------- */
 async function abrirCamara(){
+  const cam=$('cam');cam.hidden=false;document.body.classList.add('noscroll');$('qrin').value='';
+  history.pushState({cam:1},'');
   if(typeof Html5Qrcode==='undefined'){toast('No se pudo cargar el lector. Escribe el código.');return}
-  const el=$('lector'),btn=$('btncam');if(!el)return;
-  scan.hecho=null;scan.res=null;scan.code='';
-  el.hidden=false;btn.innerHTML='Cerrar cámara';btn.dataset.a='cerrarcam';
   let leido=false;
   try{
     lector=new Html5Qrcode('lector');
     await lector.start({facingMode:'environment'},{fps:10,qrbox:(w,h)=>{const s=Math.floor(Math.min(w,h)*0.7);return{width:s,height:s}}},
-      async texto=>{if(leido)return;leido=true;if(navigator.vibrate)navigator.vibrate(80);await cerrarCamara();buscar(texto)},()=>{});
-  }catch(e){await cerrarCamara();render();toast('No se pudo abrir la cámara. Revisa el permiso del navegador o escribe el código.')}
+      async texto=>{if(leido)return;leido=true;if(navigator.vibrate)navigator.vibrate(80);await cerrarCamara(true);buscar(texto)},()=>{});
+  }catch(e){await detenerLector();toast('No se pudo abrir la cámara. Revisa el permiso del navegador o escribe el código.')}
 }
-async function cerrarCamara(){
-  if(lector){const l=lector;lector=null;try{await l.stop()}catch(e){}try{l.clear()}catch(e){}}
+async function detenerLector(){if(lector){const l=lector;lector=null;try{await l.stop()}catch(e){}try{l.clear()}catch(e){}}}
+async function cerrarCamara(volver){
+  await detenerLector();
+  if($('cam').hidden)return;
+  $('cam').hidden=true;document.body.classList.remove('noscroll');
+  if(volver&&history.state&&history.state.cam)history.replaceState(null,'');
 }
-async function buscar(texto){
+function buscar(texto){
   let c=String(texto||'').trim();
   try{const u=new URL(c);c=u.searchParams.get('qr')||c}catch(e){}
   c=c.toUpperCase();const m=c.match(/QR-[A-Z0-9]+/);if(m)c=m[0];
-  if(!c)return;
-  scan.code=c;scan.res=null;scan.hecho=null;scan.buscando=true;render();
-  try{scan.res=await api('buscarQR',tok(),c)}catch(e){scan.res={valido:false};toast(e.message)}
-  finally{scan.buscando=false}
-  if(tab==='escanear'&&!sub)render();
+  if(!c){toast('Escribe el código.');return}
+  abrirEntrega({qr:c});
 }
 
 /* ---------- Excel ---------- */
@@ -497,13 +703,16 @@ function leerExcel(file){
     const kTel=find(k=>k.includes('tel')||k.includes('cel')||k.includes('whats'));
     const kE=find(k=>k.includes('correo')||k.includes('email')||k.includes('mail'));
     const kH=find(k=>k.includes('herman'));
+    const kTr=find(k=>k.includes('transporte')||k.includes('ruta'));
     const faltan=[!kN&&'Nombre',!kC&&'CURP',!kG&&'Grupo'].filter(Boolean).join(', ');
     const filas=rows.map(x=>{let g=String(x[kG]||'').trim();if(kGr&&kGr!==kG&&/^[AB]$/i.test(g))g=String(x[kGr]).trim()+g;
-      return{nombre:String(x[kN]||'').trim(),curp:String(x[kC]||'').trim().toUpperCase(),grupo:g,tutor:kT?String(x[kT]).trim():'',telefono:kTel?String(x[kTel]).trim():'',correo:kE?String(x[kE]).trim():'',curpHermano:kH?String(x[kH]).trim().toUpperCase():''}}).filter(x=>x.nombre||x.curp);
+      return{nombre:String(x[kN]||'').trim(),curp:String(x[kC]||'').trim().toUpperCase(),grupo:g,tutor:kT?String(x[kT]).trim():'',telefono:kTel?String(x[kTel]).trim():'',correo:kE?String(x[kE]).trim():'',curpHermano:kH?String(x[kH]).trim().toUpperCase():'',transporte:kTr?String(x[kTr]).trim():''}}).filter(x=>x.nombre||x.curp);
     ok({filas,faltan});
   }catch(e){mal(new Error('No pude leer el archivo. Guárdalo como .xlsx e intenta de nuevo.'))}};r.onerror=()=>mal(new Error('No pude leer el archivo.'));r.readAsArrayBuffer(file)});
 }
 function descargar(blob,nombre){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+const filtroRep=()=>({grupo:val('rg'),tipo:val('rt'),alumno:val('rn'),desde:val('rd'),hasta:val('rh')});
+async function recargarTodo(){if(sub())await cargarSub();else await cargar()}
 
 /* ---------- Eventos ---------- */
 document.addEventListener('click',async e=>{
@@ -515,34 +724,52 @@ document.addEventListener('click',async e=>{
   switch(a){
     case 'salir':return cerrarSesion();
     case 'atras':return atras();
+    case 'verpass':{const i=$('lp');i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'Ver':'Ocultar';return}
     case 'cancelar':confirmar=null;return render();
     case 'pedir':confirmar=b.dataset.k;return render();
     case 'camara':return abrirCamara();
-    case 'cerrarcam':await cerrarCamara();return render();
-    case 'siguiente':scan={code:'',res:null,hecho:null};render();return abrirCamara();
+    case 'cerrarcam':{await cerrarCamara();if(history.state&&history.state.cam)history.back();return}
+    case 'siguiente':return atras(abrirCamara);
+    case 'filtro':filtro=b.dataset.val;return render();
+    case 'hoyfiltro':hoyFiltro=b.dataset.val;return render();
+    case 'dur':permDur=b.dataset.val;return render();
+    case 'modo':E.transporte=b.dataset.val==='transporte';E.hermanos={};E.res.hermanos.forEach(h=>{if(h.permiso!=='no'&&!h.salida)E.hermanos[h.id]=E.transporte?!!h.transporte:['siempre','propio','dir'].indexOf(h.permiso)>=0});return render();
+    case 'motivo':E.motivo=b.dataset.val;render();if(E.motivo==='Otro'&&$('motivoOtro'))$('motivoOtro').focus();return;
+    case 'entrega':return abrirEntrega({id});
     case 'ficha':D.ficha=null;return abrir({t:'ficha',id});
     case 'alta':return abrir({t:'alta'});
     case 'importar':D.imp=null;return abrir({t:'importar'});
     case 'reportes':return abrir({t:'reportes'});
     case 'clave':return abrir({t:'clave'});
     case 'ciclo':return abrir({t:'ciclo'});
+    case 'horario':return abrir({t:'horario'});
+    case 'transporteDir':D.trans=null;return abrir({t:'transporte'});
+    case 'permisosDir':D.perm=null;return abrir({t:'permisosDir'});
     case 'nuevomaestro':return abrir({t:'maestro'});
     case 'vermaestro':return abrir({t:'maestro',id});
     case 'vergrupo':grupoSel=b.dataset.g;guardar('grupoSel',grupoSel);D.lista=null;D.busqueda='';return ir('alumnos');
-    case 'pickh':$('ah').value=b.dataset.curp;$('ahsel').innerHTML=`<div class="item" style="cursor:default"><div class="grow"><b>${esc(b.dataset.n)}</b><span class="s">Mismo PIN y cuenta que su hermano</span></div><button class="btn sm" type="button" data-a="unpickh">Quitar</button></div>`;$('ahres').innerHTML='';$('ahq').value='';$('famnueva').hidden=true;return;
+    case 'pickh':$('ah').value=b.dataset.curp;$('ahsel').innerHTML=`<div class="item"><div class="grow"><b>${esc(b.dataset.n)}</b><span class="s">Mismo PIN y cuenta que su hermano</span></div><button class="btn sm" type="button" data-a="unpickh">Quitar</button></div>`;$('ahres').innerHTML='';$('ahq').value='';$('famnueva').hidden=true;return;
     case 'unpickh':$('ah').value='';$('ahsel').innerHTML='';$('famnueva').hidden=false;return;
-    case 'plantilla':{const ws=XLSX.utils.aoa_to_sheet([['Nombre','CURP','Grupo','Tutor','Telefono','Correo','CURP hermano mayor'],['Ana López García','LOGA150312MNLPRN05','3A','María García','8112345678','maria@correo.com',''],['Luis López García','LOGL170905HNLPRS02','1A','','','','LOGA150312MNLPRN05']]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Alumnos');XLSX.writeFile(wb,'plantilla-alumnos.xlsx');return}
+    case 'plantilla':{const ws=XLSX.utils.aoa_to_sheet([['Nombre','CURP','Grupo','Tutor','Telefono','Correo','CURP hermano mayor','Transporte'],['Ana López García','LOGA150312MNLPRN05','3A','María García','8112345678','maria@correo.com','','Ruta 1'],['Luis López García','LOGL170905HNLPRS02','1A','','','','LOGA150312MNLPRN05','Ruta 1']]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Alumnos');XLSX.writeFile(wb,'plantilla-alumnos.xlsx');return}
   }
   await hacer(b,async()=>{
     switch(a){
-      case 'nuevoqr':await api('cambiarQR',tok(),id);confirmar=null;toast('Código QR cambiado. El anterior ya no funciona.');if(sub)await cargarSub();else await cargar();break;
-      case 'quitarp':await api('quitarPersona',tok(),id);confirmar=null;toast('Persona quitada.');if(sub)await cargarSub();else await cargar();break;
-      case 'quitarpermiso':await api('quitarPermiso',tok(),id);toast('Permiso quitado.');await cargar();break;
+      case 'nuevoqr':await api('cambiarQR',tok(),id);confirmar=null;toast('Código QR cambiado. El anterior ya no funciona.');await recargarTodo();break;
+      case 'quitarp':await api('quitarPersona',tok(),id);confirmar=null;toast('Persona quitada.');await recargarTodo();break;
+      case 'quitarpermiso':await api('quitarPermiso',tok(),id);confirmar=null;toast('Permiso quitado.');await recargarTodo();break;
+      case 'permitirhermano':await api('darPermiso',tok(),{maestroId:b.dataset.m,alumnoId:id,duracion:'siempre'});toast('Listo: puede entregarlo siempre. Lo puedes quitar cuando quieras.');await cargar();break;
       case 'pinnuevo':{const p=await api('restablecerPin',tok(),id);toast('PIN nuevo: '+p);await cargarSub();break}
-      case 'baja':await api('editarAlumno',tok(),{id,activo:b.dataset.v==='1'});confirmar=null;toast(b.dataset.v==='1'?'Alumno reactivado.':'Alumno dado de baja.');await cargarSub();break;
+      case 'baja':await api('editarAlumno',tok(),{id,activo:b.dataset.val==='1'});confirmar=null;toast(b.dataset.val==='1'?'Alumno reactivado.':'Alumno dado de baja.');await cargarSub();break;
       case 'delmaestro':await api('guardarMaestro',tok(),{id,eliminar:true});toast('Maestro eliminado.');D.maestros=null;atras();break;
-      case 'salida':{const sel=document.querySelector('input[name=pk]:checked');if(!sel){toast('Toca la foto de quien recoge al alumno.');return}
-        const r=await api('registrarSalida',tok(),id,sel.value);scan.hecho={hora:r.hora,correo:r.correo,alumno:b.dataset.n,persona:sel.dataset.n};scan.res=null;scan.code='';render();window.scrollTo(0,0);break}
+      case 'transporte':{const ids=b.dataset.ids.split(',');const r=await api('entregarTransporte',tok(),ids);confirmar=null;toast(`${r.n} ${r.n===1?'alumno entregado':'alumnos entregados'} al transporte a las ${r.hora}.`);await recargarTodo();break}
+      case 'deshacer':{await api('deshacerSalida',tok(),b.dataset.ids.split(','));confirmar=null;toast('Salida anulada. El alumno sigue en la escuela.');const o=E.res&&E.res.alumno?{id:E.res.alumno.id}:E.o;E=Object.assign(E,{o,res:null,hecho:null});render();await cargarSub();break}
+      case 'registrar':{
+        const r=E.res;const herm=hermanosElegibles().filter(h=>E.hermanos[h.id]).map(h=>h.id);
+        let motivo='';
+        if(r.temprana&&!E.transporte){if(!E.motivo){toast('Elige el motivo de la salida temprana.');return}motivo=E.motivo==='Otro'?'Otro: '+(val('motivoOtro')||'sin detalle'):E.motivo}
+        if(!E.transporte&&!E.persona){toast('Toca la foto de quien recoge al alumno.');return}
+        const res=await api('registrarSalida',tok(),id,E.persona,{hermanos:herm,transporte:E.transporte,motivo,via:E.via});
+        E.hecho=res;confirmar=null;render();window.scrollTo(0,0);break}
       case 'excel':{const r=await api('exportarExcel',tok(),filtroRep());const bin=atob(r.base64);const u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);descargar(new Blob([u8],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre);break}
       case 'subirimp':{const p=D.imp;p.res=new Array(p.filas.length);render();
         for(let i=0;i<p.filas.length;i+=60){const r=await api('importarFilas',tok(),p.filas.slice(i,i+60));r.forEach((x,j)=>p.res[i+j]=x);render()}
@@ -566,27 +793,31 @@ document.addEventListener('input',e=>{
 
 document.addEventListener('change',async e=>{
   const t=e.target;
-  if(t.id==='fa'&&t.files[0]){await hacer(null,async()=>{toast('Subiendo foto…');await api('fotoAlumno',tok(),sub.id,await leerFoto(t.files[0]));toast('Foto actualizada.');await cargarSub()})}
+  if(t.name==='pk'&&E){E.persona=t.value;return}
+  if(t.dataset.h&&E){E.hermanos[t.dataset.h]=t.checked;const b=$('btnreg');if(b)b.innerHTML=botonRegistrar();return}
+  if(t.id==='fa'&&t.files[0]){await hacer(null,async()=>{toast('Subiendo foto…');await api('fotoAlumno',tok(),sub().id,await leerFoto(t.files[0]));toast('Foto actualizada.');await cargarSub()})}
   if(t.id==='xls'&&t.files[0]){await hacer(null,async()=>{D.imp=await leerExcel(t.files[0]);render()})}
 });
 
-const filtroRep=()=>({grupo:val('rg'),alumno:val('rn'),desde:val('rd'),hasta:val('rh')});
-
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target,btn=f.querySelector('button[type=submit]');
+  if(f.id==='f-scan'){const v=val('qrin');await cerrarCamara(true);buscar(v);return}
+  if(f.id==='f-scan2'){buscar(val('qrin2'));return}
   await hacer(btn,async()=>{
     switch(f.id){
-      case 'f-login':{const r=await api('entrar',rolLogin,val('lu'),val('lp'));ses=r;guardar('sesion',r);tab='';sub=null;D={};render();await cargar();break}
-      case 'f-scan':await buscar(val('qrin'));break;
+      case 'f-login':{const r=await api('entrar',rolLogin,val('lu'),val('lp'));guardar('usuario_'+rolLogin,val('lu'));ses=r;guardar('sesion',r);tab='';pila=[];D={};render();await cargar();break}
       case 'f-persona':{const file=$('pf').files[0];if(!file){toast('Agrega la foto del rostro.');return}
-        await api('agregarPersona',tok(),{nombre:val('pn'),parentesco:val('pr'),foto:await leerFoto(file),famId:f.dataset.fam||''});toast('Persona agregada.');if(sub)await cargarSub();else await cargar();break}
+        await api('agregarPersona',tok(),{nombre:val('pn'),parentesco:val('pr'),foto:await leerFoto(file),famId:f.dataset.fam||''});toast('Persona agregada.');await recargarTodo();break}
       case 'f-contacto':await api('cambiarContacto',tok(),{correo:val('cc'),telefono:val('ct')});toast('Datos guardados.');await cargar();break;
       case 'f-pin':await api('cambiarPin',tok(),val('np'));toast('PIN actualizado.');f.reset();break;
-      case 'f-permiso':await api('darPermiso',tok(),val('gt'));toast('Permiso dado por hoy.');await cargar();break;
-      case 'f-alumno':await api('editarAlumno',tok(),{id:sub.id,nombre:val('en'),curp:val('ec'),grupo:val('eg')});toast('Cambios guardados.');D.lista=null;await cargarSub();break;
+      case 'f-permiso':await api('darPermiso',tok(),{maestroId:val('gt'),alumnoId:val('ga'),duracion:permDur});toast(permDur==='siempre'?'Permiso permanente dado. Puedes quitarlo cuando quieras.':'Permiso dado por hoy.');await cargar();break;
+      case 'f-permalumno':await api('darPermiso',tok(),{maestroId:val('pm'),alumnoId:sub().id,duracion:permDur});toast('Permiso dado.');await cargarSub();break;
+      case 'f-permdir':await api('darPermiso',tok(),{maestroId:val('pdm'),grupo:val('pdg'),duracion:permDur});toast('Permiso dado.');await cargarSub();break;
+      case 'f-horario':{const r=await api('guardarConfig',tok(),{horaSalida:val('hs')});D.resumen&&(D.resumen.horaSalida=r.horaSalida);toast('Hora de salida: '+r.horaSalida);atras();break}
+      case 'f-alumno':await api('editarAlumno',tok(),{id:sub().id,nombre:val('en'),curp:val('ec'),grupo:val('eg'),transporte:val('etr')});toast('Cambios guardados.');D.lista=null;await cargarSub();break;
       case 'f-familia':await api('editarFamilia',tok(),{id:f.dataset.id,tutor:val('ft'),pin:val('fp'),correo:val('fc'),telefono:val('fte')});toast('Familia actualizada.');await cargarSub();break;
-      case 'f-alta':{const r=await api('altaAlumno',tok(),{nombre:val('an'),curp:val('ac'),grupo:val('ag'),curpHermano:val('ah'),tutor:val('at'),correo:val('ae'),telefono:val('aw')});
-        toast(r.hermano?'Alumno agregado a la cuenta de su hermano.':'Alumno dado de alta. PIN de la familia: '+r.pin);grupoSel=val('ag');D.lista=null;D.ficha=null;sub={t:'ficha',id:r.id};render();await cargarSub();break}
+      case 'f-alta':{const r=await api('altaAlumno',tok(),{nombre:val('an'),curp:val('ac'),grupo:val('ag'),transporte:val('atr'),curpHermano:val('ah'),tutor:val('at'),correo:val('ae'),telefono:val('aw')});
+        toast(r.hermano?'Alumno agregado a la cuenta de su hermano.':'Alumno dado de alta. PIN de la familia: '+r.pin);grupoSel=val('ag');D.lista=null;D.ficha=null;pila[pila.length-1]={t:'ficha',id:r.id};render();await cargarSub();break}
       case 'f-maestro':{const r=await api('guardarMaestro',tok(),{id:f.dataset.id||'',nombre:val('mn'),grupo:val('mg'),usuario:val('mu'),contrasena:val('mc'),correo:val('me')});
         toast('Guardado. Contraseña: '+r.contrasena);D.maestros=await api('listaMaestros',tok());atras();break}
       case 'f-reporte':D.filtro=filtroRep();D.reporte=await api('reporte',tok(),D.filtro);render();break;

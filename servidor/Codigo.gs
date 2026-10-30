@@ -4,17 +4,22 @@
  *
  * Base de datos: esta hoja de cálculo en Google Drive.
  * Fotos: carpeta "Salidas QR - Fotos" en Drive.
- * La página (index.html) vive en el dominio de la escuela y llama a esta API.
+ * La página (index.html) vive en GitHub Pages y llama a esta API.
  */
 
 const TZ = 'America/Monterrey';
+const VERSION = 2;
+const HORA_SALIDA_DEFAULT = '14:30';
+const DIAS_SESION = 30;
+// Las columnas nuevas siempre van al final: así las hojas existentes se actualizan solas.
 const HOJAS = {
-  Alumnos:  ['ID', 'Nombre', 'CURP', 'Grupo', 'QR', 'FamiliaID', 'Activo', 'FotoID'],
+  Alumnos:  ['ID', 'Nombre', 'CURP', 'Grupo', 'QR', 'FamiliaID', 'Activo', 'FotoID', 'Transporte'],
   Familias: ['ID', 'Tutor', 'PIN', 'Telefono', 'Correo'],
   Personas: ['ID', 'FamiliaID', 'Nombre', 'Parentesco', 'FotoID'],
   Maestros: ['ID', 'Nombre', 'Grupo', 'Usuario', 'Contrasena', 'Correo'],
-  Salidas:  ['Fecha', 'Hora', 'AlumnoID', 'Alumno', 'Grupo', 'Recogio', 'Parentesco', 'FotoID', 'Entrego'],
-  Permisos: ['Fecha', 'Grupo', 'MaestroID'],
+  Salidas:  ['Fecha', 'Hora', 'AlumnoID', 'Alumno', 'Grupo', 'Recogio', 'Parentesco', 'FotoID', 'Entrego', 'Tipo', 'Motivo', 'Via'],
+  // Duracion: 'hoy' o 'siempre'. AlumnoID vacío = todo el grupo.
+  Permisos: ['Fecha', 'Grupo', 'MaestroID', 'Duracion', 'AlumnoID', 'DadoPor', 'ID'],
   Config:   ['Clave', 'Valor']
 };
 const TEXTO = {
@@ -26,13 +31,16 @@ const GRUPOS = ['1°A','1°B','2°A','2°B','3°A','3°B','4°A','4°B','5°A','
 /* ================= API ================= */
 
 const API = {
-  entrar, salir,
+  version, entrar, salir,
   datosPadre, cambiarQR, cambiarPin, cambiarContacto, agregarPersona, quitarPersona,
-  buscarQR, registrarSalida, datosMaestro, darPermiso, quitarPermiso,
+  buscarQR, abrirAlumno, registrarSalida, entregarTransporte, deshacerSalida,
+  datosMaestro, darPermiso, quitarPermiso, listaPermisos,
   resumenDir, listaGrupo, buscarAlumnos, fichaAlumno, altaAlumno, editarAlumno, fotoAlumno,
-  editarFamilia, restablecerPin, listaMaestros, guardarMaestro,
+  editarFamilia, restablecerPin, listaMaestros, guardarMaestro, transporteDir, guardarConfig,
   importarFilas, reporte, exportarExcel, cerrarCicloDir, cambiarClaveDir
 };
+
+function version() { return { version: VERSION }; }
 
 function doPost(e) {
   let out;
@@ -40,6 +48,7 @@ function doPost(e) {
     const b = JSON.parse(e.postData.contents);
     const f = API[b.fn];
     if (!f) throw new Error('Acción no válida.');
+    migrar();
     out = { ok: true, data: f.apply(null, b.args || []) };
   } catch (err) {
     out = { ok: false, error: err && err.message ? err.message : String(err) };
@@ -76,6 +85,22 @@ function instalar() {
     avisar('Instalación lista.\n\nUsuario de dirección: direccion\nContraseña: ' + clave +
       '\n\nAnótala. Podrás cambiarla desde la página (Más → Contraseña).');
   }
+}
+
+// Agrega al final de cada hoja las columnas nuevas (una sola vez por versión)
+function migrar() {
+  const c = CacheService.getScriptCache();
+  if (c.get('esquema') === String(VERSION)) return;
+  Object.keys(HOJAS).forEach(n => {
+    const sh = hoja(n);
+    if (!sh) return;
+    const enc = HOJAS[n];
+    const actual = sh.getRange(1, 1, 1, enc.length).getValues()[0].map(x => String(x || '').trim());
+    const usadas = actual.filter(x => x !== '').length;
+    if (usadas < enc.length && enc.slice(0, usadas).every((k, i) => actual[i] === k))
+      sh.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight('bold').setBackground('#dbefee');
+  });
+  c.put('esquema', String(VERSION), 21600);
 }
 
 // Muestra el mensaje en el registro y como aviso flotante en la hoja (sin bloquear la ejecución)
@@ -187,6 +212,8 @@ function generarDatosDePrueba() {
       if (i % 4 === 0 && grado(g) > 1) nuevoAlumno(GRUPOS[Math.floor(azar() * (grado(g) - 1)) * 2 + (azar() < 0.5 ? 0 : 1)], fam, ap1, ap2);
     }
   });
+  // Transporte: algunas familias usan transporte escolar (todos sus hijos en la misma ruta)
+  alumnos.forEach(a => { const n = parseInt(a.FamiliaID.slice(1), 10); a.Transporte = n % 8 === 5 ? 'Ruta ' + (1 + n % 3) : ''; });
   // Historial: últimos 5 días hábiles antes de hoy
   const salidas = [], ahoraMs = Date.now();
   let dias = 0;
@@ -202,8 +229,10 @@ function generarDatosDePrueba() {
       const p = uno(ps);
       const m = maestros.find(x => x.Grupo === a.Grupo);
       const min = 30 + Math.floor(azar() * 45);
-      salidas.push({ Fecha: fecha, Hora: (15 + Math.floor(min / 60)) + ':' + String(min % 60).padStart(2, '0'), AlumnoID: a.ID, Alumno: a.Nombre,
-        Grupo: a.Grupo, Recogio: p.Nombre, Parentesco: p.Parentesco, FotoID: '', Entrego: m ? m.Nombre : 'Dirección' });
+      const hora = (14 + Math.floor((min + 30) / 60)) + ':' + String((min + 30) % 60).padStart(2, '0');
+      const base = { Fecha: fecha, Hora: hora, AlumnoID: a.ID, Alumno: a.Nombre, Grupo: a.Grupo, FotoID: '', Entrego: m ? m.Nombre : 'Dirección', Motivo: '', Via: 'QR' };
+      salidas.push(a.Transporte ? Object.assign(base, { Recogio: 'Transporte ' + a.Transporte, Parentesco: '', Tipo: 'Transporte', Via: 'Lista' })
+        : Object.assign(base, { Recogio: p.Nombre, Parentesco: p.Parentesco, Tipo: 'Normal' }));
     });
   }
   salidas.sort((x, y) => (x.Fecha + x.Hora).localeCompare(y.Fecha + y.Hora));
@@ -298,25 +327,55 @@ function mayorActivo(familiaId, alumnos) {
 const personasDe = famId => filas('Personas').filter(p => p.FamiliaID === famId)
   .map(p => ({ id: p.ID, nombre: p.Nombre, parentesco: p.Parentesco, foto: fotoDataUrl(p.FotoID) }));
 
-const salidaCorta = x => ({ fecha: x.Fecha, hora: x.Hora, alumno: x.Alumno, grupo: x.Grupo, recogio: x.Recogio, parentesco: x.Parentesco, entrego: x.Entrego });
+const salidaCorta = x => ({ fecha: x.Fecha, hora: x.Hora, alumno: x.Alumno, grupo: x.Grupo, recogio: x.Recogio, parentesco: x.Parentesco,
+  entrego: x.Entrego, tipo: x.Tipo || 'Normal', motivo: x.Motivo || '' });
+const nombreCorto = a => a.Nombre.split(' ')[0];
+const horaSalida = () => cfg('hora_salida') || HORA_SALIDA_DEFAULT;
+const porNombre = (a, b) => a.Nombre.localeCompare(b.Nombre);
 
 /* ================= SESIONES ================= */
 
+// Las sesiones duran 30 días (el teléfono recuerda al usuario). "Salir" las cierra.
 function crearSesion(datos) {
   const t = Utilities.getUuid() + Utilities.getUuid();
-  CacheService.getScriptCache().put('s_' + t, JSON.stringify(datos), 21600); // 6 horas
+  datos.exp = Date.now() + DIAS_SESION * 86400000;
+  const v = JSON.stringify(datos);
+  PropertiesService.getScriptProperties().setProperty('s_' + t, v);
+  CacheService.getScriptCache().put('s_' + t, v, 21600);
+  if (Math.random() < 0.1) limpiarSesiones();
   return t;
 }
 
+function limpiarSesiones() {
+  const p = PropertiesService.getScriptProperties(), todas = p.getProperties(), ya = Date.now();
+  Object.keys(todas).forEach(k => {
+    if (k.indexOf('s_') !== 0) return;
+    let exp = 0;
+    try { exp = JSON.parse(todas[k]).exp || 0; } catch (e) {}
+    if (exp < ya) p.deleteProperty(k);
+  });
+}
+
 function sesion(token, roles) {
-  const c = token && CacheService.getScriptCache().get('s_' + token);
-  if (!c) throw new Error('Tu sesión terminó. Vuelve a entrar.');
-  const s = JSON.parse(c);
+  if (!token) throw new Error('Tu sesión terminó. Vuelve a entrar.');
+  const c = CacheService.getScriptCache();
+  let v = c.get('s_' + token);
+  if (!v) {
+    v = PropertiesService.getScriptProperties().getProperty('s_' + token);
+    if (v) c.put('s_' + token, v, 21600);
+  }
+  if (!v) throw new Error('Tu sesión terminó. Vuelve a entrar.');
+  const s = JSON.parse(v);
+  if (s.exp && s.exp < Date.now()) { salir(token); throw new Error('Tu sesión terminó. Vuelve a entrar.'); }
   if (roles && roles.indexOf(s.rol) < 0) throw new Error('Tu usuario no tiene permiso para esto.');
   return s;
 }
 
-function salir(token) { CacheService.getScriptCache().remove('s_' + token); return true; }
+function salir(token) {
+  CacheService.getScriptCache().remove('s_' + token);
+  PropertiesService.getScriptProperties().deleteProperty('s_' + token);
+  return true;
+}
 
 /* ================= LOGIN ================= */
 
@@ -357,15 +416,19 @@ function datosPadre(token) {
   const s = sesion(token, ['padre']);
   const fam = filas('Familias').find(f => f.ID === s.fam);
   const maestros = filas('Maestros');
+  const salidas = filas('Salidas');
   const hijos = filas('Alumnos').filter(a => a.FamiliaID === s.fam && a.Activo !== 'NO')
     .sort((a, b) => grado(b.Grupo) - grado(a.Grupo))
-    .map(a => ({ id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR,
-      maestro: (maestros.find(m => m.Grupo === a.Grupo) || {}).Nombre || 'Por asignar' }));
+    .map(a => {
+      const x = salidas.filter(y => y.AlumnoID === a.ID && y.Fecha === hoy()).pop();
+      return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: a.Transporte,
+        maestro: (maestros.find(m => m.Grupo === a.Grupo) || {}).Nombre || 'Por asignar', hoy: x ? salidaCorta(x) : null };
+    });
   const ids = hijos.map(h => h.id);
   return {
     tutor: fam.Tutor, telefono: fam.Telefono, correo: fam.Correo, hijos,
     personas: personasDe(s.fam),
-    historial: filas('Salidas').filter(x => ids.indexOf(x.AlumnoID) >= 0).slice(-60).reverse().map(salidaCorta)
+    historial: salidas.filter(x => ids.indexOf(x.AlumnoID) >= 0).slice(-60).reverse().map(salidaCorta)
   };
 }
 
@@ -430,8 +493,55 @@ function quitarPersona(token, personaId) {
 
 /* ================= MAESTRO ================= */
 
-function permisoHoy(maestroId, grupo) {
-  return filas('Permisos').some(p => p.Fecha === hoy() && p.Grupo === grupo && p.MaestroID === maestroId);
+/* Permisos activos: los de 'siempre' y los de hoy. 'clave' identifica cada uno para quitarlo. */
+function permisosActivos() {
+  const h = hoy();
+  return filas('Permisos').filter(p => p.Duracion === 'siempre' || p.Fecha === h)
+    .map(p => Object.assign(p, { clave: p.ID || ('#' + p._fila) }));
+}
+
+// 'propio' (su grupo) · 'siempre' / 'hoy' (con permiso) · 'dir' (dirección) · 'no'
+function nivelPermiso(yo, a, permisos) {
+  if (!yo) return 'dir';
+  if (yo.Grupo === a.Grupo) return 'propio';
+  const p = (permisos || permisosActivos()).filter(x => x.MaestroID === yo.ID && (x.AlumnoID ? x.AlumnoID === a.ID : x.Grupo === a.Grupo));
+  if (!p.length) return 'no';
+  return p.some(x => x.Duracion === 'siempre') ? 'siempre' : 'hoy';
+}
+
+function maestroDeSesion(s, maestros) {
+  if (s.rol !== 'maestro') return null;
+  const yo = (maestros || filas('Maestros')).find(m => m.ID === s.id);
+  if (!yo) throw new Error('Tu usuario ya no existe. Habla con la dirección.');
+  return yo;
+}
+
+// Todo lo que el maestro necesita ver para entregar a un alumno (y a sus hermanos)
+function datosEntrega(s, a) {
+  const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos();
+  const yo = maestroDeSesion(s, maestros);
+  const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
+  const titular = g => (maestros.find(m => m.Grupo === g) || {}).Nombre || 'Sin maestro';
+  const salidaDe = id => { const x = salHoy.filter(y => y.AlumnoID === id).pop(); return x ? salidaCorta(x) : null; };
+  const permiso = nivelPermiso(yo, a, permisos);
+  return {
+    valido: true,
+    alumno: { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, foto: fotoDataUrl(a.FotoID), titular: titular(a.Grupo), transporte: a.Transporte },
+    permiso,
+    salida: salidaDe(a.ID),
+    puedeDeshacer: puedeDeshacer(yo, salHoy.filter(y => y.AlumnoID === a.ID).pop()),
+    personas: permiso === 'no' ? [] : personasDe(a.FamiliaID),
+    hermanos: alumnos.filter(x => x.FamiliaID === a.FamiliaID && x.ID !== a.ID && x.Activo !== 'NO').map(x => ({
+      id: x.ID, nombre: x.Nombre, grupo: x.Grupo, titular: titular(x.Grupo), transporte: x.Transporte,
+      permiso: nivelPermiso(yo, x, permisos), salida: salidaDe(x.ID) })),
+    horaSalida: horaSalida(),
+    temprana: ahora() < horaSalida()
+  };
+}
+
+function puedeDeshacer(yo, salida) {
+  if (!salida) return false;
+  return !yo || salida.Entrego === yo.Nombre || salida.Grupo === yo.Grupo;
 }
 
 function buscarQR(token, codigo) {
@@ -439,94 +549,229 @@ function buscarQR(token, codigo) {
   codigo = txt(codigo).toUpperCase();
   const a = filas('Alumnos').find(x => x.QR.toUpperCase() === codigo && x.Activo !== 'NO');
   if (!a) return { valido: false };
-  const maestros = filas('Maestros');
-  const yo = s.rol === 'maestro' ? maestros.find(m => m.ID === s.id) : null;
-  const titular = maestros.find(m => m.Grupo === a.Grupo);
-  let permiso = 'dir';
-  if (yo) permiso = yo.Grupo === a.Grupo ? 'propio' : (permisoHoy(yo.ID, a.Grupo) ? 'autorizado' : 'no');
-  const salida = filas('Salidas').filter(x => x.AlumnoID === a.ID && x.Fecha === hoy()).pop();
-  return {
-    valido: true,
-    alumno: { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, foto: fotoDataUrl(a.FotoID), titular: titular ? titular.Nombre : 'Sin maestro' },
-    permiso,
-    salida: salida ? { hora: salida.Hora, recogio: salida.Recogio } : null,
-    personas: permiso === 'no' ? [] : personasDe(a.FamiliaID)
-  };
+  return datosEntrega(s, a);
 }
 
-function registrarSalida(token, alumnoId, personaId) {
+// Abrir a un alumno desde la lista (sin QR)
+function abrirAlumno(token, id) {
   const s = sesion(token, ['maestro', 'dir']);
-  const res = conBloqueo(() => {
-    const a = filas('Alumnos').find(x => x.ID === alumnoId);
-    if (!a) throw new Error('Alumno no encontrado.');
-    const yo = s.rol === 'maestro' ? filas('Maestros').find(m => m.ID === s.id) : null;
-    if (yo && yo.Grupo !== a.Grupo && !permisoHoy(yo.ID, a.Grupo))
-      throw new Error('No tienes permiso para entregar a alumnos de ' + a.Grupo + '.');
-    if (filas('Salidas').some(x => x.AlumnoID === a.ID && x.Fecha === hoy()))
-      throw new Error('Este alumno ya tiene salida registrada hoy.');
-    const p = filas('Personas').find(x => x.ID === personaId && x.FamiliaID === a.FamiliaID);
-    if (!p) throw new Error('Esa persona no está autorizada para este alumno.');
-    const reg = { Fecha: hoy(), Hora: ahora(), AlumnoID: a.ID, Alumno: a.Nombre, Grupo: a.Grupo,
-      Recogio: p.Nombre, Parentesco: p.Parentesco, FotoID: p.FotoID, Entrego: yo ? yo.Nombre : 'Dirección' };
-    agregar('Salidas', reg);
-    return { reg, fam: filas('Familias').find(f => f.ID === a.FamiliaID) };
+  const a = filas('Alumnos').find(x => x.ID === id && x.Activo !== 'NO');
+  if (!a) throw new Error('Alumno no encontrado.');
+  return datosEntrega(s, a);
+}
+
+/*
+ * Registra la salida de uno o varios alumnos (hermanos) a la vez.
+ * extra: { hermanos: [ids], transporte: true/false, motivo: '...', via: 'QR' | 'Lista' }
+ * Antes de la hora de salida se registra como "Temprana" y pide motivo.
+ */
+function registrarSalida(token, alumnoId, personaId, extra) {
+  const s = sesion(token, ['maestro', 'dir']);
+  extra = extra || {};
+  const ids = [alumnoId].concat(extra.hermanos || []).filter((x, i, arr) => x && arr.indexOf(x) === i);
+  const regs = registrarVarios(s, ids, personaId, extra);
+  return { hora: regs[0].Hora, tipo: regs[0].Tipo, alumnos: regs.map(r => r.Alumno), ids: regs.map(r => r.AlumnoID),
+    recogio: regs[0].Recogio, correo: notificar(regs) };
+}
+
+// Entrega en bloque a los alumnos de transporte que sigan en la escuela
+function entregarTransporte(token, ids) {
+  const s = sesion(token, ['maestro', 'dir']);
+  const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
+  const pendientes = (ids || []).filter(id => !salHoy.some(x => x.AlumnoID === id));
+  if (!pendientes.length) throw new Error('Esos alumnos ya estaban entregados.');
+  const regs = registrarVarios(s, pendientes, '', { transporte: true, via: 'Lista' });
+  return { n: regs.length, hora: regs[0].Hora, ids: regs.map(r => r.AlumnoID), correo: notificar(regs) };
+}
+
+function registrarVarios(s, ids, personaId, extra) {
+  return conBloqueo(() => {
+    const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos();
+    const yo = maestroDeSesion(s, maestros);
+    const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
+    const persona = extra.transporte ? null : filas('Personas').find(x => x.ID === personaId);
+    if (!extra.transporte && !persona) throw new Error('Toca la foto de quien recoge al alumno.');
+    const hora = ahora(), temprana = hora < horaSalida(), motivo = txt(extra.motivo);
+    const regs = ids.map(id => {
+      const a = alumnos.find(x => x.ID === id && x.Activo !== 'NO');
+      if (!a) throw new Error('Alumno no encontrado.');
+      if (nivelPermiso(yo, a, permisos) === 'no') throw new Error('No tienes permiso para entregar a ' + nombreCorto(a) + ' (' + a.Grupo + ').');
+      if (salHoy.some(x => x.AlumnoID === a.ID)) throw new Error(nombreCorto(a) + ' ya tiene salida registrada hoy.');
+      const r = { Fecha: hoy(), Hora: hora, AlumnoID: a.ID, Alumno: a.Nombre, Grupo: a.Grupo, Entrego: yo ? yo.Nombre : 'Dirección',
+        Via: extra.via === 'Lista' ? 'Lista' : 'QR', Motivo: motivo, _fam: a.FamiliaID };
+      if (extra.transporte) {
+        if (!a.Transporte) throw new Error(nombreCorto(a) + ' no tiene transporte asignado.');
+        return Object.assign(r, { Tipo: 'Transporte', Recogio: 'Transporte ' + a.Transporte, Parentesco: '', FotoID: '' });
+      }
+      if (persona.FamiliaID !== a.FamiliaID) throw new Error(persona.Nombre + ' no está autorizado(a) para ' + nombreCorto(a) + '.');
+      if (temprana && !motivo) throw new Error('Es salida temprana: elige el motivo.');
+      return Object.assign(r, { Tipo: temprana ? 'Temprana' : 'Normal', Recogio: persona.Nombre, Parentesco: persona.Parentesco, FotoID: persona.FotoID });
+    });
+    regs.forEach(r => agregar('Salidas', r));  // primero se valida todo, luego se escribe
+    return regs;
   });
-  let correo = 'sin correo registrado';
-  if (res.fam && res.fam.Correo) {
-    try {
-      if (MailApp.getRemainingDailyQuota() < 1) throw new Error('cuota');
-      const r = res.reg;
-      MailApp.sendEmail({
-        to: res.fam.Correo,
-        name: cfg('nombre_escuela') || 'Escuela',
-        subject: 'Salida de ' + r.Alumno.split(' ')[0] + ' – ' + r.Hora,
-        htmlBody: '<p>Hola, ' + res.fam.Tutor + ':</p><p><b>' + r.Alumno + '</b> (' + r.Grupo + ') salió de la escuela hoy ' +
-          r.Fecha + ' a las <b>' + r.Hora + '</b> con <b>' + r.Recogio + '</b> (' + r.Parentesco + ').</p><p>Lo entregó: ' +
-          r.Entrego + '.</p><p style="color:#666">Si no reconoces esta salida, comunícate de inmediato con la escuela.</p>'
-      });
-      correo = 'enviado';
-    } catch (e) { correo = 'no se pudo enviar'; }
-  }
-  return { hora: res.reg.Hora, correo };
+}
+
+// Un correo por familia con todos sus hijos
+function notificar(regs) {
+  const familias = filas('Familias');
+  const grupos = {};
+  regs.forEach(r => (grupos[r._fam] = grupos[r._fam] || []).push(r));
+  const res = Object.keys(grupos).map(fid => {
+    const fam = familias.find(f => f.ID === fid);
+    if (!fam || !fam.Correo) return 'sin correo registrado';
+    const rs = grupos[fid], r = rs[0];
+    const nombres = rs.map(x => '<b>' + x.Alumno + '</b> (' + x.Grupo + ')').join(' y ');
+    const como = r.Tipo === 'Transporte' ? 'subió al <b>' + r.Recogio + '</b>'
+      : 'salió con <b>' + r.Recogio + '</b> (' + r.Parentesco + ')';
+    const extra = r.Tipo === 'Temprana' ? '<p>Salida temprana. Motivo: ' + r.Motivo + '.</p>' : '';
+    return enviarCorreo(fam, 'Salida de ' + rs.map(x => x.Alumno.split(' ')[0]).join(' y ') + ' – ' + r.Hora,
+      '<p>Hola, ' + fam.Tutor + ':</p><p>' + nombres + (rs.length > 1 ? ' salieron' : '') + ' hoy ' + r.Fecha + ' a las <b>' + r.Hora +
+      '</b>: ' + (rs.length > 1 ? como.replace('salió con', 'con').replace('subió al', 'en el') : como) + '.</p>' + extra +
+      '<p>Lo entregó: ' + r.Entrego + '.</p><p style="color:#666">Si no reconoces esta salida, comunícate de inmediato con la escuela.</p>');
+  });
+  if (res.every(x => x === 'enviado')) return 'enviado';
+  if (res.every(x => x === 'sin correo registrado')) return 'sin correo registrado';
+  return res.indexOf('no se pudo enviar') >= 0 ? 'no se pudo enviar' : 'enviado';
+}
+
+function enviarCorreo(fam, asunto, html) {
+  try {
+    if (MailApp.getRemainingDailyQuota() < 1) return 'no se pudo enviar';
+    MailApp.sendEmail({ to: fam.Correo, name: cfg('nombre_escuela') || 'Escuela', subject: asunto, htmlBody: html });
+    return 'enviado';
+  } catch (e) { return 'no se pudo enviar'; }
+}
+
+// Deshace la salida de hoy (por error al tocar). Puede hacerlo quien la registró, el maestro del grupo o dirección.
+function deshacerSalida(token, ids) {
+  const s = sesion(token, ['maestro', 'dir']);
+  ids = [].concat(ids || []);
+  const hechos = conBloqueo(() => {
+    const yo = maestroDeSesion(s);
+    const sal = filas('Salidas').filter(r => r.Fecha === hoy() && ids.indexOf(r.AlumnoID) >= 0);
+    if (!sal.length) throw new Error('No hay salida de hoy para deshacer.');
+    sal.forEach(r => { if (!puedeDeshacer(yo, r)) throw new Error('Solo quien la registró, su maestro o la dirección pueden deshacerla.'); });
+    sal.sort((x, y) => y._fila - x._fila).forEach(r => hoja('Salidas').deleteRow(r._fila));
+    return sal;
+  });
+  // Aviso de corrección a la familia
+  const alumnos = filas('Alumnos'), familias = filas('Familias'), avisadas = {};
+  hechos.forEach(r => {
+    const a = alumnos.find(x => x.ID === r.AlumnoID), fam = a && familias.find(f => f.ID === a.FamiliaID);
+    if (!fam || !fam.Correo || avisadas[fam.ID]) return;
+    avisadas[fam.ID] = 1;
+    enviarCorreo(fam, 'Corrección: salida de ' + nombreCorto(a), '<p>Hola, ' + fam.Tutor + ':</p><p>Se anuló el aviso de salida de las ' + r.Hora +
+      '. <b>' + a.Nombre + '</b> sigue en la escuela. Te avisaremos cuando salga.</p>');
+  });
+  return { n: hechos.length };
 }
 
 function datosMaestro(token) {
   const s = sesion(token, ['maestro']);
   const maestros = filas('Maestros');
-  const yo = maestros.find(m => m.ID === s.id);
-  if (!yo) throw new Error('Tu usuario ya no existe. Habla con la dirección.');
-  const salidasHoy = filas('Salidas').filter(x => x.Fecha === hoy());
-  const permisos = filas('Permisos').filter(p => p.Fecha === hoy());
-  const grupo = filas('Alumnos').filter(a => a.Grupo === yo.Grupo && a.Activo !== 'NO')
-    .sort((a, b) => a.Nombre.localeCompare(b.Nombre))
-    .map(a => { const x = salidasHoy.find(y => y.AlumnoID === a.ID); return { id: a.ID, nombre: a.Nombre, qr: a.QR, salio: x ? x.Hora + ' · ' + x.Recogio : '' }; });
+  const yo = maestroDeSesion(s, maestros);
+  const alumnos = filas('Alumnos').filter(a => a.Activo !== 'NO');
+  const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
+  const permisos = permisosActivos();
+  const titular = g => maestros.find(m => m.Grupo === g);
+  const item = a => {
+    const x = salHoy.filter(y => y.AlumnoID === a.ID).pop();
+    return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: a.Transporte,
+      salida: x ? Object.assign(salidaCorta(x), { mia: x.Entrego === yo.Nombre }) : null };
+  };
+  const mios = alumnos.filter(a => a.Grupo === yo.Grupo).sort(porNombre);
+  // Hermanos de otros grupos que este maestro puede entregar siempre
+  const extras = alumnos.filter(a => a.Grupo !== yo.Grupo && nivelPermiso(yo, a, permisos) === 'siempre' &&
+    permisos.some(p => p.MaestroID === yo.ID && p.AlumnoID === a.ID)).sort(porNombre).map(item);
+  // Alumnos de mi grupo con hermanos en otros grupos: sugerencias de permiso permanente
+  const hermanos = [], visto = {};
+  mios.forEach(a => alumnos.filter(h => h.FamiliaID === a.FamiliaID && h.ID !== a.ID && h.Grupo !== yo.Grupo).forEach(h => {
+    const m = titular(h.Grupo);
+    if (!m || visto[a.ID + m.ID]) return;
+    visto[a.ID + m.ID] = 1;
+    const p = permisos.find(x => x.MaestroID === m.ID && x.AlumnoID === a.ID && x.Duracion === 'siempre');
+    hermanos.push({ alumno: { id: a.ID, nombre: a.Nombre }, hermano: { nombre: h.Nombre, grupo: h.Grupo },
+      maestro: { id: m.ID, nombre: m.Nombre }, clave: p ? p.clave : '' });
+  }));
   return {
-    yo: { nombre: yo.Nombre, grupo: yo.Grupo },
-    grupo,
-    maestros: maestros.filter(m => m.ID !== yo.ID).map(m => ({ id: m.ID, nombre: m.Nombre, grupo: m.Grupo })),
-    dados: permisos.filter(p => p.Grupo === yo.Grupo).map(p => ({ id: p.MaestroID, nombre: (maestros.find(m => m.ID === p.MaestroID) || {}).Nombre || '' })),
-    recibidos: permisos.filter(p => p.MaestroID === yo.ID).map(p => ({ grupo: p.Grupo, de: (maestros.find(m => m.Grupo === p.Grupo) || {}).Nombre || '' })),
-    salidas: salidasHoy.slice().reverse().map(salidaCorta)
+    yo: { nombre: yo.Nombre, grupo: yo.Grupo }, horaSalida: horaSalida(), temprana: ahora() < horaSalida(),
+    grupo: mios.map(item), extras, hermanos,
+    alumnosGrupo: mios.map(a => ({ id: a.ID, nombre: a.Nombre })),
+    maestros: maestros.filter(m => m.ID !== yo.ID).sort((a, b) => GRUPOS.indexOf(a.Grupo) - GRUPOS.indexOf(b.Grupo))
+      .map(m => ({ id: m.ID, nombre: m.Nombre, grupo: m.Grupo })),
+    dados: permisos.filter(p => p.Grupo === yo.Grupo).map(p => describirPermiso(p, maestros, alumnos)),
+    recibidos: permisos.filter(p => p.MaestroID === yo.ID).map(p => describirPermiso(p, maestros, alumnos)),
+    salidas: salHoy.slice().reverse().map(salidaCorta)
   };
 }
 
-function darPermiso(token, maestroId) {
-  const s = sesion(token, ['maestro']);
+function describirPermiso(p, maestros, alumnos) {
+  const m = maestros.find(x => x.ID === p.MaestroID) || {};
+  const a = p.AlumnoID ? alumnos.find(x => x.ID === p.AlumnoID) : null;
+  return { clave: p.clave, maestro: m.Nombre || '(maestro eliminado)', maestroGrupo: m.Grupo || '', grupo: p.Grupo,
+    alumno: a ? a.Nombre : '', duracion: p.Duracion === 'siempre' ? 'siempre' : 'hoy',
+    titular: (maestros.find(x => x.Grupo === p.Grupo) || {}).Nombre || '', dadoPor: p.DadoPor || '' };
+}
+
+/*
+ * d: { maestroId, alumnoId (opcional: un solo alumno), grupo (solo dirección), duracion: 'hoy' | 'siempre' }
+ * El maestro da permiso sobre su propio grupo; la dirección sobre cualquiera.
+ */
+function darPermiso(token, d) {
+  const s = sesion(token, ['maestro', 'dir']);
+  if (typeof d === 'string') d = { maestroId: d };
   return conBloqueo(() => {
-    const yo = filas('Maestros').find(m => m.ID === s.id);
-    if (!permisoHoy(maestroId, yo.Grupo)) agregar('Permisos', { Fecha: hoy(), Grupo: yo.Grupo, MaestroID: maestroId });
+    const maestros = filas('Maestros');
+    const yo = maestroDeSesion(s, maestros);
+    const dest = maestros.find(m => m.ID === d.maestroId);
+    if (!dest) throw new Error('Elige un maestro.');
+    let grupo, alumnoId = '';
+    if (d.alumnoId) {
+      const a = filas('Alumnos').find(x => x.ID === d.alumnoId);
+      if (!a) throw new Error('Alumno no encontrado.');
+      if (yo && a.Grupo !== yo.Grupo) throw new Error('Solo puedes dar permiso sobre alumnos de tu grupo.');
+      grupo = a.Grupo; alumnoId = a.ID;
+    } else {
+      grupo = yo ? yo.Grupo : normalizarGrupo(d.grupo);
+      if (!grupo) throw new Error('Elige el grupo.');
+    }
+    if (dest.Grupo === grupo) throw new Error(dest.Nombre + ' ya es el maestro de ' + grupo + '.');
+    const dur = d.duracion === 'siempre' ? 'siempre' : 'hoy';
+    const ya = permisosActivos().find(p => p.MaestroID === dest.ID && p.Grupo === grupo && (p.AlumnoID || '') === alumnoId);
+    if (ya) {
+      if (dur === 'siempre' && ya.Duracion !== 'siempre') actualizar('Permisos', ya._fila, { Duracion: 'siempre' });
+      return true;
+    }
+    agregar('Permisos', { Fecha: hoy(), Grupo: grupo, MaestroID: dest.ID, Duracion: dur, AlumnoID: alumnoId,
+      DadoPor: yo ? yo.Nombre : 'Dirección', ID: nuevoId() });
     return true;
   });
 }
 
-function quitarPermiso(token, maestroId) {
-  const s = sesion(token, ['maestro']);
+// Revierte un permiso. Puede quitarlo quien lo dio (maestro del grupo), quien lo recibió o la dirección.
+function quitarPermiso(token, clave) {
+  const s = sesion(token, ['maestro', 'dir']);
   return conBloqueo(() => {
-    const yo = filas('Maestros').find(m => m.ID === s.id);
-    filas('Permisos').filter(p => p.Fecha === hoy() && p.Grupo === yo.Grupo && p.MaestroID === maestroId)
-      .reverse().forEach(p => hoja('Permisos').deleteRow(p._fila));
+    const yo = maestroDeSesion(s);
+    const lista = filas('Permisos').map(p => Object.assign(p, { clave: p.ID || ('#' + p._fila) }));
+    let p = lista.find(x => x.clave === clave);
+    if (!p && yo) p = lista.find(x => x.MaestroID === clave && x.Grupo === yo.Grupo && x.Fecha === hoy()); // versión anterior
+    if (!p) throw new Error('Ese permiso ya no existe.');
+    if (yo && p.Grupo !== yo.Grupo && p.MaestroID !== yo.ID) throw new Error('No puedes quitar este permiso.');
+    hoja('Permisos').deleteRow(p._fila);
     return true;
   });
+}
+
+function listaPermisos(token) {
+  sesion(token, ['dir']);
+  const maestros = filas('Maestros'), alumnos = filas('Alumnos');
+  return {
+    permisos: permisosActivos().map(p => describirPermiso(p, maestros, alumnos))
+      .sort((a, b) => (a.duracion === b.duracion ? 0 : a.duracion === 'siempre' ? -1 : 1) || GRUPOS.indexOf(a.grupo) - GRUPOS.indexOf(b.grupo)),
+    maestros: maestros.sort((a, b) => GRUPOS.indexOf(a.Grupo) - GRUPOS.indexOf(b.Grupo)).map(m => ({ id: m.ID, nombre: m.Nombre, grupo: m.Grupo }))
+  };
 }
 
 /* ================= DIRECCIÓN ================= */
@@ -539,8 +784,13 @@ function resumenDir(token) {
   const conteo = {};
   GRUPOS.forEach(g => conteo[g] = { alumnos: alumnos.filter(a => a.Grupo === g).length, salidas: salidasHoy.filter(x => x.Grupo === g).length,
     maestro: (maestros.find(m => m.Grupo === g) || {}).Nombre || '' });
+  const enTransporte = alumnos.filter(a => a.Transporte);
   return {
     grupos: GRUPOS, conteo, total: alumnos.length, salidasHoy: salidasHoy.length, maestros: maestros.length,
+    transporte: { total: enTransporte.length, entregados: enTransporte.filter(a => salidasHoy.some(x => x.AlumnoID === a.ID)).length },
+    tempranas: salidasHoy.filter(x => x.Tipo === 'Temprana').length,
+    permanentes: permisosActivos().filter(p => p.Duracion === 'siempre').length,
+    horaSalida: horaSalida(),
     ultimas: salidasHoy.slice(-8).reverse().map(salidaCorta),
     sinPersonas: (() => { const conP = {}; filas('Personas').forEach(p => conP[p.FamiliaID] = 1); return alumnos.filter(a => !conP[a.FamiliaID]).length; })(),
     correosRestantes: MailApp.getRemainingDailyQuota(),
@@ -553,7 +803,7 @@ function listaGrupo(token, grupo) {
   const familias = filas('Familias');
   return filas('Alumnos').filter(a => a.Grupo === grupo && a.Activo !== 'NO')
     .sort((a, b) => a.Nombre.localeCompare(b.Nombre))
-    .map(a => { const f = familias.find(x => x.ID === a.FamiliaID) || {}; return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, tutor: f.Tutor || '', pin: f.PIN || '' }; });
+    .map(a => { const f = familias.find(x => x.ID === a.FamiliaID) || {}; return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, tutor: f.Tutor || '', pin: f.PIN || '', transporte: a.Transporte }; });
 }
 
 function buscarAlumnos(token, texto) {
@@ -570,8 +820,12 @@ function fichaAlumno(token, id) {
   const a = alumnos.find(x => x.ID === id);
   if (!a) throw new Error('Alumno no encontrado.');
   const f = filas('Familias').find(x => x.ID === a.FamiliaID) || {};
+  const maestros = filas('Maestros');
   return {
-    alumno: { id: a.ID, nombre: a.Nombre, curp: a.CURP, grupo: a.Grupo, qr: a.QR, activo: a.Activo !== 'NO', foto: fotoDataUrl(a.FotoID) },
+    alumno: { id: a.ID, nombre: a.Nombre, curp: a.CURP, grupo: a.Grupo, qr: a.QR, activo: a.Activo !== 'NO', foto: fotoDataUrl(a.FotoID), transporte: a.Transporte },
+    rutas: alumnos.map(x => x.Transporte).filter((x, i, arr) => x && arr.indexOf(x) === i).sort(),
+    permisos: permisosActivos().filter(p => p.AlumnoID ? p.AlumnoID === a.ID : p.Grupo === a.Grupo).map(p => describirPermiso(p, maestros, alumnos)),
+    maestros: maestros.filter(m => m.Grupo !== a.Grupo).sort((x, y) => GRUPOS.indexOf(x.Grupo) - GRUPOS.indexOf(y.Grupo)).map(m => ({ id: m.ID, nombre: m.Nombre, grupo: m.Grupo })),
     familia: { id: f.ID, tutor: f.Tutor, pin: f.PIN, correo: f.Correo, telefono: f.Telefono },
     hermanos: alumnos.filter(x => x.FamiliaID === a.FamiliaID && x.ID !== a.ID && x.Activo !== 'NO').map(x => ({ id: x.ID, nombre: x.Nombre, grupo: x.Grupo })),
     personas: personasDe(a.FamiliaID),
@@ -600,7 +854,7 @@ function crearAlumno(d) {
       Telefono: txt(d.telefono), Correo: validarCorreo(txt(d.correo)) });
   }
   const id = nuevoId();
-  agregar('Alumnos', { ID: id, Nombre: nombre, CURP: curp, Grupo: grupo, QR: nuevoQR(), FamiliaID: famId, Activo: 'SI', FotoID: '' });
+  agregar('Alumnos', { ID: id, Nombre: nombre, CURP: curp, Grupo: grupo, QR: nuevoQR(), FamiliaID: famId, Activo: 'SI', FotoID: '', Transporte: txt(d.transporte) });
   return { id, pin, hermano: !!curpHermano };
 }
 
@@ -625,6 +879,7 @@ function editarAlumno(token, d) {
     }
     if (d.grupo !== undefined) { const g = normalizarGrupo(d.grupo); if (!g) throw new Error('Grupo no válido.'); cambios.Grupo = g; }
     if (d.activo !== undefined) cambios.Activo = d.activo ? 'SI' : 'NO';
+    if (d.transporte !== undefined) cambios.Transporte = txt(d.transporte);
     actualizar('Alumnos', a._fila, cambios);
     return true;
   });
@@ -662,6 +917,29 @@ function restablecerPin(token, famId) {
   const pin = nuevoPin();
   actualizar('Familias', f._fila, { PIN: pin });
   return pin;
+}
+
+// Alumnos de transporte agrupados por ruta, con su estado de hoy
+function transporteDir(token) {
+  sesion(token, ['dir']);
+  const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
+  const rutas = {};
+  filas('Alumnos').filter(a => a.Activo !== 'NO' && a.Transporte).sort((a, b) => GRUPOS.indexOf(a.Grupo) - GRUPOS.indexOf(b.Grupo) || porNombre(a, b))
+    .forEach(a => {
+      const x = salHoy.filter(y => y.AlumnoID === a.ID).pop();
+      (rutas[a.Transporte] = rutas[a.Transporte] || []).push({ id: a.ID, nombre: a.Nombre, grupo: a.Grupo, salida: x ? salidaCorta(x) : null });
+    });
+  return Object.keys(rutas).sort().map(r => ({ ruta: r, alumnos: rutas[r] }));
+}
+
+function guardarConfig(token, d) {
+  sesion(token, ['dir']);
+  if (d.horaSalida !== undefined) {
+    const m = txt(d.horaSalida).match(/^(\d{1,2}):(\d{2})$/);
+    if (!m || +m[1] > 23 || +m[2] > 59) throw new Error('Escribe la hora como 14:30.');
+    setCfg('hora_salida', m[1].padStart(2, '0') + ':' + m[2]);
+  }
+  return { horaSalida: horaSalida() };
 }
 
 function listaMaestros(token) {
@@ -710,19 +988,19 @@ function reporte(token, f) {
   f = f || {};
   return filas('Salidas').filter(x =>
     (!f.grupo || x.Grupo === f.grupo) && (!f.desde || x.Fecha >= f.desde) && (!f.hasta || x.Fecha <= f.hasta) &&
-    (!f.alumno || x.Alumno.toLowerCase().indexOf(txt(f.alumno).toLowerCase()) >= 0)
+    (!f.alumno || x.Alumno.toLowerCase().indexOf(txt(f.alumno).toLowerCase()) >= 0) && (!f.tipo || (x.Tipo || 'Normal') === f.tipo)
   ).reverse().map(salidaCorta);
 }
 
 function exportarExcel(token, f) {
   const rows = reporte(token, f);
   const tmp = SpreadsheetApp.create('Reporte salidas ' + hoy());
-  const datos = [['Fecha', 'Hora', 'Alumno', 'Grupo', 'Recogió', 'Parentesco', 'Entregó']]
-    .concat(rows.map(r => [r.fecha, r.hora, r.alumno, r.grupo, r.recogio, r.parentesco, r.entrego]));
+  const datos = [['Fecha', 'Hora', 'Alumno', 'Grupo', 'Tipo', 'Recogió', 'Parentesco', 'Motivo', 'Entregó']]
+    .concat(rows.map(r => [r.fecha, r.hora, r.alumno, r.grupo, r.tipo, r.recogio, r.parentesco, r.motivo, r.entrego]));
   const sh = tmp.getSheets()[0];
-  sh.getRange(1, 1, datos.length, 7).setNumberFormat('@').setValues(datos);
-  sh.getRange(1, 1, 1, 7).setFontWeight('bold');
-  sh.autoResizeColumns(1, 7);
+  sh.getRange(1, 1, datos.length, 9).setNumberFormat('@').setValues(datos);
+  sh.getRange(1, 1, 1, 9).setFontWeight('bold');
+  sh.autoResizeColumns(1, 9);
   SpreadsheetApp.flush();
   const blob = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + tmp.getId() + '/export?format=xlsx',
     { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } }).getBlob();

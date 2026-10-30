@@ -30,6 +30,8 @@ Recarga la hoja de cálculo: aparece el menú **Salidas QR**. Elige **Cargar dat
 - Demás maestros: su primer nombre sin acentos (jorge, patricia, laura…) / **maestro2026**
 - Padres: CURP del hijo mayor (pestaña Alumnos) + PIN (pestaña Familias)
 
+Para ver alumnos de transporte en los datos de prueba (si los cargaste antes de esta versión): recarga la hoja y usa **Salidas QR → Borrar todos los datos** y luego **Cargar datos de prueba**. Los usuarios y PIN son los mismos.
+
 Antes de usarla con alumnos reales: menú **Salidas QR → Borrar todos los datos** y cambia la contraseña de dirección desde la página.
 
 ## Parte 2 · GitHub (la página y su link)
@@ -46,6 +48,25 @@ El código ya está en este repositorio (`index.html` y `servidor/Codigo.gs`). S
 **Si después quieres usar tu dominio:** Settings → Pages → Custom domain, escribe tu dominio y sigue las instrucciones de DNS que te da GitHub. Activa **Enforce HTTPS**.
 
 **Qué es público y qué no:** el código de la página es visible para cualquiera, pero no contiene datos. Los alumnos, PIN y fotos viven solo en tu Google Drive, y para verlos hay que iniciar sesión. Nunca subas la hoja de cálculo ni contraseñas al repositorio.
+
+## Actualizar el servidor (cada vez que cambie `servidor/Codigo.gs`)
+
+La página se actualiza sola desde GitHub, pero el servidor de Google Drive hay que actualizarlo a mano:
+
+1. En GitHub abre **servidor/Codigo.gs** y toca **Copy raw file**.
+2. En Apps Script (Extensiones → Apps Script desde la hoja) selecciona todo el código, bórralo, pega y **Guarda**.
+3. **Implementar → Administrar implementaciones** → lápiz ✏️ → en *Versión* elige **Nueva versión** → **Implementar**. Así la URL no cambia.
+
+Las hojas existentes se actualizan solas (se agregan columnas nuevas al final); no se pierde nada.
+
+## Funciones
+
+- **Salidas (maestro):** botón grande para escanear, lista del grupo con estado de cada alumno. Tocar a un alumno permite darle salida sin QR, verla o deshacerla.
+- **Salida temprana:** antes de la hora de salida (Dirección → Más → Hora de salida, por defecto 14:30) se pide el motivo y queda marcada como *Temprana* en reportes y en el correo.
+- **Transporte:** el alumno con ruta asignada (ficha → Transporte escolar, o columna *Transporte* del Excel) se entrega al transporte uno por uno o todo el grupo en bloque. Dirección ve cada ruta en Más → Transporte.
+- **Hermanos:** al escanear a un alumno aparecen sus hermanos para darles salida juntos. En **Permisos**, el maestro puede dejar que el maestro del hermano lo entregue **siempre**; se quita cuando se quiera (lo puede quitar quien lo dio, quien lo recibió o dirección).
+- **Deshacer:** si se registró por error, se anula y la familia recibe un correo de corrección.
+- **Sesión:** queda abierta 30 días en cada teléfono.
 
 ## Parte 3 · Empezar a usarla (desde el celular, como dirección)
 
