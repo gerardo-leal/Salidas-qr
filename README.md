@@ -71,7 +71,7 @@ Las hojas existentes se actualizan solas (se agregan columnas nuevas al final); 
 ## Parte 3 · Empezar a usarla (desde el celular, como dirección)
 
 1. Entra con usuario **direccion** y la contraseña anotada. Cámbiala en **Más → Contraseña**.
-2. **Más → Importar alumnos**: descarga la plantilla, llénala (o usa tu Excel con columnas Nombre, CURP, Grupo, Tutor, Teléfono, Correo, CURP hermano mayor) y súbela. Cada familia nueva recibe un PIN.
+2. **Más → Importar alumnos**: descarga la **plantilla de Excel** (también está en este repositorio: `plantilla-alumnos.xlsx`), llénala en dirección con nombre, grado y grupo, CURP, si se va en transporte y el CURP de sus hermanos, y súbela. Los hermanos quedan en una sola cuenta familiar y cada familia nueva recibe un PIN.
 3. **Maestros → Agregar maestro**: uno por grupo. Comparte a cada uno su usuario y contraseña.
 4. Con las hojas de autorización firmadas: busca al alumno en **Alumnos**, abre su ficha y agrega las **personas autorizadas** con foto (puedes tomarla con el celular).
 5. Entrega a cada familia su CURP de acceso (el del hijo mayor) y su PIN. El padre ve el QR en su cuenta.

@@ -854,7 +854,7 @@ function crearAlumno(d) {
       Telefono: txt(d.telefono), Correo: validarCorreo(txt(d.correo)) });
   }
   const id = nuevoId();
-  agregar('Alumnos', { ID: id, Nombre: nombre, CURP: curp, Grupo: grupo, QR: nuevoQR(), FamiliaID: famId, Activo: 'SI', FotoID: '', Transporte: txt(d.transporte) });
+  agregar('Alumnos', { ID: id, Nombre: nombre, CURP: curp, Grupo: grupo, QR: nuevoQR(), FamiliaID: famId, Activo: 'SI', FotoID: '', Transporte: transporteDe(d) });
   return { id, pin, hermano: !!curpHermano };
 }
 
@@ -969,17 +969,55 @@ function guardarMaestro(token, d) {
   });
 }
 
-// filas: [{nombre, curp, grupo, tutor, telefono, correo, curpHermano}] leídas del Excel en el teléfono
+// "Sí" + ruta → ruta (o "Transporte" si no hay ruta); "No" o vacío → sin transporte; texto libre → ese texto
+function transporteDe(d) {
+  const t = txt(d.transporte), ruta = txt(d.ruta);
+  if (/^no$/i.test(t)) return '';
+  if (/^s[ií]$/i.test(t)) return ruta || 'Transporte';
+  return t || ruta;
+}
+
+/*
+ * Importa filas leídas del Excel de dirección:
+ * { nombre, grupo, curp, transporte, ruta, hermanos: 'CURP, CURP', tutor, correo, telefono }
+ * Los hermanos se unen en una sola familia aunque solo uno de ellos escriba el CURP del otro.
+ */
 function importarFilas(token, lista) {
   sesion(token, ['dir']);
   if (!Array.isArray(lista) || !lista.length) throw new Error('El archivo no tiene alumnos.');
-  // Primero los que no dependen de un hermano, luego los que sí
-  const orden = lista.map((r, i) => ({ r, i })).sort((a, b) => (txt(a.r.curpHermano) ? 1 : 0) - (txt(b.r.curpHermano) ? 1 : 0));
   const res = new Array(lista.length);
-  conBloqueo(() => orden.forEach(({ r, i }) => {
-    try { const x = crearAlumno(r); res[i] = { ok: true, msg: x.hermano ? 'Agregado a la familia de su hermano' : 'PIN ' + x.pin }; }
-    catch (e) { res[i] = { ok: false, msg: e.message }; }
-  }));
+  conBloqueo(() => {
+    const existe = {};
+    filas('Alumnos').forEach(a => existe[a.CURP.toUpperCase()] = 1);
+    const padre = {};
+    const raiz = x => { while (padre[x] !== x) x = padre[x]; return x; };
+    const unir = (a, b) => { [a, b].forEach(x => { if (!padre[x]) padre[x] = x; }); const ra = raiz(a), rb = raiz(b); if (ra !== rb) padre[rb] = ra; };
+    const filasN = lista.map((r, i) => {
+      const curp = txt(r.curp).toUpperCase().replace(/\s/g, '');
+      const key = curp || ('#fila' + i);
+      if (!padre[key]) padre[key] = key;
+      (txt(r.hermanos) + ' ' + txt(r.curpHermano)).toUpperCase().split(/[^A-Z0-9]+/)
+        .filter(x => x.length === 18 && x !== curp).forEach(h => unir(key, h));
+      return { r: Object.assign({}, r, { curp }), i, key };
+    });
+    const familias = {};
+    filasN.forEach(f => (familias[raiz(f.key)] = familias[raiz(f.key)] || []).push(f));
+    Object.keys(familias).forEach(k => {
+      const miembros = familias[k].sort((a, b) => grado(normalizarGrupo(b.r.grupo)) - grado(normalizarGrupo(a.r.grupo)));
+      // Si algún hermano ya estaba inscrito, todos se unen a esa familia
+      let base = Object.keys(padre).find(c => raiz(c) === k && existe[c]) || '';
+      const contacto = miembros.find(m => txt(m.r.tutor) || txt(m.r.correo) || txt(m.r.telefono));
+      miembros.forEach(m => {
+        try {
+          const d = Object.assign({}, m.r, { curpHermano: base });
+          if (!base && contacto) Object.assign(d, { tutor: contacto.r.tutor, correo: contacto.r.correo, telefono: contacto.r.telefono });
+          const x = crearAlumno(d);
+          res[m.i] = { ok: true, msg: base ? 'Unido a la familia de su hermano(a)' : 'Familia nueva · PIN ' + x.pin };
+          if (!base) base = m.r.curp;
+        } catch (e) { res[m.i] = { ok: false, msg: e.message }; }
+      });
+    });
+  });
   return res;
 }
 

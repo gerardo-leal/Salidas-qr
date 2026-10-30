@@ -435,7 +435,7 @@ dir_mas(){
   ${item('transporteDir','Transporte','Rutas, quién ya subió y entrega por ruta')}
   ${item('permisosDir','Permisos entre maestros','Ver, dar y quitar permisos de hoy o permanentes')}
   ${item('horario','Hora de salida','Antes de esa hora la salida cuenta como temprana')}
-  ${item('importar','Importar alumnos desde Excel','Sube el archivo desde el teléfono o la computadora')}
+  ${item('importar','Importar alumnos desde Excel','Descarga la plantilla, llénala y súbela')}
   ${item('reportes','Reportes de salidas','Por día, grupo, alumno o tipo; descarga en Excel')}
   ${item('clave','Contraseña de dirección','Cámbiala periódicamente')}
   ${item('ciclo','Cerrar ciclo escolar','Sube a todos de grado y archiva el historial')}
@@ -609,17 +609,20 @@ horario(){
 },
 importar(){
   const p=D.imp;
-  let h=`<h1>Importar alumnos</h1><section class="card"><p>Sube un Excel con una fila por alumno y estas columnas:</p>
-  <p class="muted"><b>Nombre</b>, <b>CURP</b>, <b>Grupo</b> (ej. 3A), Tutor, Teléfono, Correo, CURP hermano mayor, Transporte (ej. Ruta 1).</p>
-  <p class="muted">Para hermanos: el mayor va sin hermano; los menores llevan el CURP del mayor.</p>
-  <button class="btn full" data-a="plantilla">Descargar plantilla de Excel</button>
+  let h=`<h1>Importar alumnos</h1><section class="card"><p><b>1.</b> Descarga la plantilla y llénala en dirección: una fila por alumno con <b>nombre</b>, <b>grado y grupo</b>, <b>CURP</b>, <b>si se va en transporte</b> y el <b>CURP de sus hermanos</b> inscritos.</p>
+  <a class="btn full" href="plantilla-alumnos.xlsx" download="Plantilla alumnos - Salidas QR.xlsx">Descargar plantilla de Excel</a>
+  <p><b>2.</b> Sube el archivo lleno. Antes de importar verás cómo quedó cada alumno.</p>
   <label class="btn pri big full" for="xls">Elegir archivo de Excel<input id="xls" type="file" accept=".xlsx,.xls,.csv" hidden></label></section>`;
   if(p&&p.filas){
-    h+=`<section class="card"><h2>${p.filas.length} alumnos encontrados</h2>${p.faltan?`<p class="pill bad" style="align-self:flex-start">No encontré la columna: ${esc(p.faltan)}</p>`:''}
-    <div class="tbl"><table><thead><tr><th>Nombre</th><th>CURP</th><th>Grupo</th><th>Hermano</th><th>Transporte</th>${p.res?'<th>Resultado</th>':''}</tr></thead><tbody>
-    ${p.filas.map((r,i)=>`<tr><td>${esc(r.nombre)}</td><td class="code">${esc(r.curp)}</td><td>${esc(r.grupo)}</td><td class="code">${esc(r.curpHermano)}</td><td>${esc(r.transporte)}</td>${p.res?`<td>${p.res[i]?`<span class="pill ${p.res[i].ok?'ok':'bad'}">${esc(p.res[i].msg)}</span>`:'…'}</td>`:''}</tr>`).join('')}
+    const malos=p.filas.filter(r=>r.aviso).length, fams=p.bloques?p.familias:0;
+    h+=`<section class="card"><h2>${p.filas.length} alumnos encontrados</h2>
+    ${p.faltan?`<p class="pill bad" style="align-self:flex-start">No encontré la columna: ${esc(p.faltan)}</p>`:''}
+    <p class="muted">${fams} familias${p.conHermanos?` · ${p.conHermanos} alumnos con hermanos`:''}${p.enTransporte?` · ${p.enTransporte} en transporte`:''}${malos?` · <b style="color:var(--bad)">${malos} con datos por corregir</b>`:''}</p>
+    <div class="tbl"><table><thead><tr><th>Alumno</th><th>Grupo</th><th>CURP</th><th>Transporte</th><th>Hermanos</th><th>${p.res?'Resultado':'Revisión'}</th></tr></thead><tbody>
+    ${p.filas.map((r,i)=>`<tr><td>${esc(r.nombre)}</td><td>${esc(r.grupo)}</td><td class="code">${esc(r.curp)}</td><td>${esc(transporteTexto(r))}</td><td>${r.nHermanos?r.nHermanos:''}</td><td>${p.res?(p.res[i]?`<span class="pill ${p.res[i].ok?'ok':'bad'}">${esc(p.res[i].msg)}</span>`:'…'):(r.aviso?`<span class="pill bad">${esc(r.aviso)}</span>`:'<span class="pill ok">Listo</span>')}</td></tr>`).join('')}
     </tbody></table></div>
-    ${p.res?`<p><b>${p.res.filter(x=>x&&x.ok).length}</b> dados de alta · <b>${p.res.filter(x=>x&&!x.ok).length}</b> con error</p>`:`<button class="btn pri big full" data-a="subirimp" ${p.faltan?'disabled':''}>Importar ${p.filas.length} alumnos</button>`}</section>`;
+    ${p.res?`<p><b>${p.res.filter(x=>x&&x.ok).length}</b> dados de alta · <b>${p.res.filter(x=>x&&!x.ok).length}</b> con error. Corrige los errores en el Excel y súbelo otra vez: los que ya entraron se marcarán como ya registrados.</p>`
+      :`<button class="btn pri big full" data-a="subirimp" ${p.faltan?'disabled':''}>Importar ${p.filas.length} alumnos</button>${malos?'<p class="muted">Las filas con datos por corregir no se darán de alta; las demás sí.</p>':''}`}</section>`;
   }
   return h;
 },
@@ -690,25 +693,53 @@ function buscar(texto){
 
 /* ---------- Excel ---------- */
 const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'');
+function transporteTexto(r){const t=String(r.transporte||'').trim();if(/^no$/i.test(t)||(!t&&!r.ruta))return'No';if(/^s[ií]$/i.test(t))return r.ruta||'Sí';return t||r.ruta}
+const esCurp=c=>/^[A-Z0-9]{18}$/.test(c);
 function leerExcel(file){
   return new Promise((ok,mal)=>{const r=new FileReader();r.onload=()=>{try{
     const wb=XLSX.read(new Uint8Array(r.result),{type:'array'});
-    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
-    if(!rows.length)return mal(new Error('El archivo está vacío.'));
-    const keys=Object.keys(rows[0]);const find=t=>keys.find(k=>t(norm(k)));
-    const kN=find(k=>k.includes('nombre')&&!k.includes('tutor')&&!k.includes('padre')&&!k.includes('herman'));
-    const kC=find(k=>k.includes('curp')&&!k.includes('herman'));
-    const kG=find(k=>k==='grupo'||k.includes('grupo'));const kGr=find(k=>k==='grado'||k.includes('grado'));
-    const kT=find(k=>k.includes('tutor')||k.includes('padre')||k.includes('madre'));
-    const kTel=find(k=>k.includes('tel')||k.includes('cel')||k.includes('whats'));
-    const kE=find(k=>k.includes('correo')||k.includes('email')||k.includes('mail'));
-    const kH=find(k=>k.includes('herman'));
-    const kTr=find(k=>k.includes('transporte')||k.includes('ruta'));
-    const faltan=[!kN&&'Nombre',!kC&&'CURP',!kG&&'Grupo'].filter(Boolean).join(', ');
-    const filas=rows.map(x=>{let g=String(x[kG]||'').trim();if(kGr&&kGr!==kG&&/^[AB]$/i.test(g))g=String(x[kGr]).trim()+g;
-      return{nombre:String(x[kN]||'').trim(),curp:String(x[kC]||'').trim().toUpperCase(),grupo:g,tutor:kT?String(x[kT]).trim():'',telefono:kTel?String(x[kTel]).trim():'',correo:kE?String(x[kE]).trim():'',curpHermano:kH?String(x[kH]).trim().toUpperCase():'',transporte:kTr?String(x[kTr]).trim():''}}).filter(x=>x.nombre||x.curp);
-    ok({filas,faltan});
+    const hoja=wb.SheetNames.find(n=>norm(n)==='alumnos')||wb.SheetNames[0];
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[hoja],{header:1,defval:'',raw:false,blankrows:false});
+    const hi=aoa.findIndex(f=>f.some(c=>norm(c).includes('curp')));
+    if(hi<0)return mal(new Error('No encontré los encabezados. Usa la plantilla de la escuela (debe tener la columna CURP).'));
+    const enc=aoa[hi].map(norm),col=t=>enc.findIndex(t);
+    const cN=col(k=>k.includes('nombre')&&!k.includes('tutor')&&!k.includes('padre')&&!k.includes('madre')&&!k.includes('herman'));
+    const cC=col(k=>k.includes('curp')&&!k.includes('herman'));
+    const cG=col(k=>k.includes('grupo')),cGr=col(k=>k.includes('grado')&&!k.includes('grupo'));
+    const cTr=col(k=>k.includes('transporte')&&!k.includes('ruta')),cRu=col(k=>k.includes('ruta'));
+    const cH=col(k=>k.includes('herman'));
+    const cT=col(k=>(k.includes('tutor')||k.includes('padre')||k.includes('madre'))&&!k.includes('correo')&&!k.includes('mail')&&!k.includes('tel'));
+    const cTel=col(k=>k.includes('tel')||k.includes('cel')||k.includes('whats'));
+    const cE=col(k=>k.includes('correo')||k.includes('mail'));
+    const faltan=[cN<0&&'Nombre del alumno',cC<0&&'CURP',(cG<0&&cGr<0)&&'Grado y grupo'].filter(Boolean).join(', ');
+    const v=(f,c)=>c<0?'':String(f[c]==null?'':f[c]).trim();
+    const filas=aoa.slice(hi+1).map(f=>{
+      let g=v(f,cG);const gr=v(f,cGr);if(gr&&(!g||/^[AB]$/i.test(g)))g=gr+g;
+      const curp=v(f,cC).toUpperCase().replace(/\s/g,'');
+      const hermanos=v(f,cH).toUpperCase();
+      const nH=hermanos.split(/[^A-Z0-9]+/).filter(x=>x.length===18&&x!==curp).length;
+      const gm=g.toUpperCase().replace(/\s/g,'').match(/^([1-6])\D*([AB])$/);
+      const nombre=v(f,cN);
+      const aviso=!nombre?'Falta el nombre':!esCurp(curp)?'CURP debe tener 18 caracteres':!gm?'Revisa grado y grupo':'';
+      return{nombre,curp,grupo:gm?gm[1]+'°'+gm[2]:g,transporte:v(f,cTr),ruta:v(f,cRu),hermanos,nHermanos:nH,tutor:v(f,cT),telefono:v(f,cTel),correo:v(f,cE),aviso};
+    }).filter(x=>x.nombre||x.curp);
+    if(!filas.length)return mal(new Error('El archivo no tiene alumnos. Llena la hoja «Alumnos» a partir de la fila 2.'));
+    const bloques=bloquesPorFamilia(filas);
+    ok({filas,faltan,bloques,familias:bloques.familias,conHermanos:bloques.conHermanos,enTransporte:filas.filter(x=>transporteTexto(x)!=='No').length});
   }catch(e){mal(new Error('No pude leer el archivo. Guárdalo como .xlsx e intenta de nuevo.'))}};r.onerror=()=>mal(new Error('No pude leer el archivo.'));r.readAsArrayBuffer(file)});
+}
+// Agrupa a los hermanos para enviarlos juntos al servidor (lotes de hasta 60 alumnos)
+function bloquesPorFamilia(filas){
+  const padre={},raiz=x=>{while(padre[x]!==x)x=padre[x];return x};
+  const unir=(a,b)=>{[a,b].forEach(x=>{if(!padre[x])padre[x]=x});const ra=raiz(a),rb=raiz(b);if(ra!==rb)padre[rb]=ra};
+  const keys=filas.map((f,i)=>{const k=f.curp||('#'+i);if(!padre[k])padre[k]=k;f.hermanos.split(/[^A-Z0-9]+/).filter(x=>x.length===18&&x!==f.curp).forEach(h=>unir(k,h));return k});
+  const grupos={};keys.forEach((k,i)=>(grupos[raiz(k)]=grupos[raiz(k)]||[]).push(i));
+  const lotes=[];let lote=[];
+  Object.values(grupos).forEach(g=>{if(lote.length&&lote.length+g.length>60){lotes.push(lote);lote=[]}lote=lote.concat(g)});
+  if(lote.length)lotes.push(lote);
+  lotes.familias=Object.keys(grupos).length;
+  lotes.conHermanos=Object.values(grupos).filter(g=>g.length>1).reduce((n,g)=>n+g.length,0);
+  return lotes;
 }
 function descargar(blob,nombre){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
 const filtroRep=()=>({grupo:val('rg'),tipo:val('rt'),alumno:val('rn'),desde:val('rd'),hasta:val('rh')});
@@ -750,7 +781,6 @@ document.addEventListener('click',async e=>{
     case 'vergrupo':grupoSel=b.dataset.g;guardar('grupoSel',grupoSel);D.lista=null;D.busqueda='';return ir('alumnos');
     case 'pickh':$('ah').value=b.dataset.curp;$('ahsel').innerHTML=`<div class="item"><div class="grow"><b>${esc(b.dataset.n)}</b><span class="s">Mismo PIN y cuenta que su hermano</span></div><button class="btn sm" type="button" data-a="unpickh">Quitar</button></div>`;$('ahres').innerHTML='';$('ahq').value='';$('famnueva').hidden=true;return;
     case 'unpickh':$('ah').value='';$('ahsel').innerHTML='';$('famnueva').hidden=false;return;
-    case 'plantilla':{const ws=XLSX.utils.aoa_to_sheet([['Nombre','CURP','Grupo','Tutor','Telefono','Correo','CURP hermano mayor','Transporte'],['Ana López García','LOGA150312MNLPRN05','3A','María García','8112345678','maria@correo.com','','Ruta 1'],['Luis López García','LOGL170905HNLPRS02','1A','','','','LOGA150312MNLPRN05','Ruta 1']]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Alumnos');XLSX.writeFile(wb,'plantilla-alumnos.xlsx');return}
   }
   await hacer(b,async()=>{
     switch(a){
@@ -772,7 +802,7 @@ document.addEventListener('click',async e=>{
         E.hecho=res;confirmar=null;render();window.scrollTo(0,0);break}
       case 'excel':{const r=await api('exportarExcel',tok(),filtroRep());const bin=atob(r.base64);const u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);descargar(new Blob([u8],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre);break}
       case 'subirimp':{const p=D.imp;p.res=new Array(p.filas.length);render();
-        for(let i=0;i<p.filas.length;i+=60){const r=await api('importarFilas',tok(),p.filas.slice(i,i+60));r.forEach((x,j)=>p.res[i+j]=x);render()}
+        for(const lote of p.bloques){const r=await api('importarFilas',tok(),lote.map(i=>p.filas[i]));r.forEach((x,j)=>p.res[lote[j]]=x);render()}
         toast('Importación terminada.');break}
     }
   });
