@@ -706,8 +706,9 @@ const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''
 function transporteTexto(r){const t=String(r.transporte||'').trim();if(/^no$/i.test(t)||(!t&&!r.ruta))return'No';if(/^s[ií]$/i.test(t))return r.ruta||'Sí';return t||r.ruta}
 const esCurp=c=>/^[A-Z0-9]{18}$/.test(c);
 function leerExcel(file){
+  const esCsv=/\.csv$/i.test(file.name||'');
   return new Promise((ok,mal)=>{const r=new FileReader();r.onload=()=>{try{
-    const wb=XLSX.read(new Uint8Array(r.result),{type:'array'});
+    const wb=esCsv?XLSX.read(String(r.result).replace(/^\uFEFF/,''),{type:'string'}):XLSX.read(new Uint8Array(r.result),{type:'array'});
     const hoja=wb.SheetNames.find(n=>norm(n)==='alumnos')||wb.SheetNames[0];
     const aoa=XLSX.utils.sheet_to_json(wb.Sheets[hoja],{header:1,defval:'',raw:false,blankrows:false});
     const hi=aoa.findIndex(f=>f.some(c=>norm(c).includes('curp')));
@@ -736,7 +737,7 @@ function leerExcel(file){
     if(!filas.length)return mal(new Error('El archivo no tiene alumnos. Llena la hoja «Alumnos» a partir de la fila 2.'));
     const bloques=bloquesPorFamilia(filas);
     ok({filas,faltan,bloques,familias:bloques.familias,conHermanos:bloques.conHermanos,enTransporte:filas.filter(x=>transporteTexto(x)!=='No').length});
-  }catch(e){mal(new Error('No pude leer el archivo. Guárdalo como .xlsx e intenta de nuevo.'))}};r.onerror=()=>mal(new Error('No pude leer el archivo.'));r.readAsArrayBuffer(file)});
+  }catch(e){mal(new Error('No pude leer el archivo. Guárdalo como .xlsx e intenta de nuevo.'))}};r.onerror=()=>mal(new Error('No pude leer el archivo.'));if(esCsv)r.readAsText(file,'utf-8');else r.readAsArrayBuffer(file)});
 }
 // Agrupa a los hermanos para enviarlos juntos al servidor (lotes de hasta 60 alumnos)
 function bloquesPorFamilia(filas){
