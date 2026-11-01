@@ -66,6 +66,7 @@ Las hojas existentes se actualizan solas (se agregan columnas nuevas al final); 
 - **Transporte:** el alumno con ruta asignada (ficha → Transporte escolar, o columna *Transporte* del Excel) se entrega al transporte uno por uno o todo el grupo en bloque. Dirección ve cada ruta en Más → Transporte.
 - **Hermanos:** al escanear a un alumno aparecen sus hermanos para darles salida juntos. En **Permisos**, el maestro puede dejar que el maestro del hermano lo entregue **siempre**; se quita cuando se quiera (lo puede quitar quien lo dio, quien lo recibió o dirección).
 - **Deshacer:** si se registró por error, se anula y la familia recibe un correo de corrección.
+- **Ayuda para todos:** la primera vez que alguien entra ve una guía corta; el botón **Ayuda** tiene los pasos, preguntas frecuentes y un video: `videos/padres.mp4` y `videos/maestros.mp4` (se pueden mandar por WhatsApp).
 - **Sesión:** queda abierta 30 días en cada teléfono. «Borrar todos los datos» cierra todas las sesiones.
 - **Hermanos en la ficha:** dirección puede unir a dos alumnos como hermanos (misma cuenta y PIN) o separar a uno con su propia cuenta.
 - **Volver a subir el Excel:** los alumnos ya inscritos no se duplican; se actualiza su grupo y transporte.

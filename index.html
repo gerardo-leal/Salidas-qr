@@ -140,6 +140,27 @@ nav.bar svg{width:24px;height:24px}
 table{border-collapse:collapse;width:100%;font-size:.85rem}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-size:.72rem;text-transform:uppercase;color:var(--muted)}
+#guia{position:fixed;inset:0;z-index:35;background:rgba(10,20,24,.55);display:flex;align-items:flex-end;justify-content:center;
+  padding:16px max(16px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+#guia .caja{background:var(--card);border-radius:22px;max-width:460px;width:100%;padding:22px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+#guia .ico{width:64px;height:64px;border-radius:18px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+#guia .ico svg{width:36px;height:36px}
+#guia h2{font-size:1.3rem}
+#guia p{font-size:1.02rem;line-height:1.5}
+.puntos{display:flex;gap:6px}.puntos i{width:8px;height:8px;border-radius:50%;background:var(--line)}.puntos i.on{background:var(--accent);width:22px;border-radius:4px}
+ol.pasos{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;counter-reset:p}
+ol.pasos li{display:grid;grid-template-columns:34px 1fr;gap:2px 10px;counter-increment:p}
+ol.pasos li::before{content:counter(p);grid-row:span 2;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--card);display:grid;place-items:center;font-weight:600;font-size:.9rem}
+ol.pasos b{font-weight:600}ol.pasos span{color:var(--muted);font-size:.9rem}
+.ayudita{font-size:.82rem;color:var(--muted);font-weight:400}
+.aviso{display:flex;gap:12px;align-items:center;background:var(--warn-soft);border-radius:14px;padding:12px 14px}
+.aviso svg{width:26px;height:26px;flex:none;color:var(--warn)}
+.paso{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--card);font-size:.78rem;font-weight:600;margin-right:6px;vertical-align:1px}
+.rolcard{display:flex;gap:12px;align-items:center;text-align:left;font:inherit;width:100%;border:2px solid var(--line);border-radius:14px;padding:12px;background:var(--card);color:var(--fg);cursor:pointer}
+.rolcard svg{width:30px;height:30px;color:var(--accent);flex:none}
+.rolcard[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.rolcard b{display:block}.rolcard span{font-size:.84rem;color:var(--muted)}
+.top .row{flex-wrap:nowrap;gap:6px}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -154,6 +175,7 @@ th{font-size:.72rem;text-transform:uppercase;color:var(--muted)}
     <form id="f-scan" class="row"><input id="qrin" class="grow" placeholder="O escribe el código: QR-…" autocapitalize="characters" spellcheck="false" aria-label="Código QR"><button class="btn pri" type="submit">Buscar</button></form>
   </div>
 </div>
+<div id="guia" hidden role="dialog" aria-modal="true" aria-labelledby="guiaTit"></div>
 <div id="toast" hidden role="status" aria-live="polite"></div>
 
 <script>
@@ -184,6 +206,47 @@ const I={
   person:svg('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-1a7 7 0 0114 0v1"/>'),
   chev:'<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
   back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>'
+};
+
+/* ---------- Ayuda por tipo de usuario ---------- */
+const GUIAS={
+  padre:{
+    bienvenida:[[I.qr,'Este es el código de tu hijo(a)','En «Mis hijos» está el código QR de cada uno. La persona que lo recoja debe mostrarlo al maestro a la hora de la salida.'],
+      [I.people,'Di quién puede recogerlo','En «Autorizados» agrega con foto a quien pasa por tu hijo: mamá, papá, abuelos… El maestro verá esa foto antes de entregarlo.'],
+      [I.clock,'Te avisamos cada salida','Recibes un correo cada vez que sale y lo puedes ver en «Historial». Escribe tu correo en «Cuenta».']],
+    pasos:[['Abre «Mis hijos»','Ahí está el código QR de cada hijo inscrito.'],['Guarda el código','Toma captura de pantalla, imprímelo o pégalo en la credencial. Así funciona aunque no tengas internet.'],
+      ['Agrega a los autorizados','En «Autorizados» escribe nombre y parentesco, y toma una foto del rostro.'],['A la hora de la salida','Quien recoge muestra el código al maestro. El maestro revisa la foto y registra la salida.'],
+      ['Recibe el aviso','Te llega un correo y la salida queda en «Historial».']],
+    faq:[['Perdí el código o lo tiene alguien que no quiero','En «Mis hijos» toca «Cambiar código QR». El anterior deja de funcionar en ese momento.'],
+      ['Olvidé mi PIN','Pídelo en la dirección de la escuela. Después puedes cambiarlo en «Cuenta».'],
+      ['Tengo varios hijos en la escuela','Todos aparecen en tu cuenta. Entras con el CURP del hijo mayor.'],
+      ['¿Necesito internet a la salida?','Para mostrar el código no, si lo guardaste en captura o impreso.']],
+    video:'videos/padres.mp4'},
+  maestro:{
+    bienvenida:[[I.scan,'Escanea el código','Toca «Escanear código QR» y apunta la cámara al código que te muestran. El alumno aparece solo.'],
+      [I.person,'Revisa quién lo recoge','Toca la foto de la persona que vino por el alumno y luego «Registrar salida». Si no está en las fotos, no lo entregues.'],
+      [I.list,'¿No traen código?','Toca al alumno en tu lista para darle salida, pidiendo identificación.'],
+      [I.key,'Hermanos y permisos','En «Permisos» dejas que otro maestro entregue a tus alumnos, solo hoy o siempre.']],
+    pasos:[['Toca «Escanear código QR»','La primera vez el teléfono pide permiso para usar la cámara: toca «Permitir».'],
+      ['Apunta al código','Aparece el alumno con las fotos de quien lo puede recoger.'],['Toca la foto de quien recoge','Si no está en las fotos, no lo entregues y avisa a la dirección.'],
+      ['Revisa hermanos y motivo','Si sus hermanos salen juntos aparecen marcados. Antes de la hora de salida elige el motivo.'],
+      ['Toca «Registrar salida»','La familia recibe un correo. Toca «Escanear siguiente» para el próximo alumno.'],
+      ['Transporte','En tu lista toca «Entregar al transporte» cuando suban.']],
+    faq:[['Registré una salida por error','Abre al alumno en tu lista y toca «Deshacer esta salida». La familia recibe un aviso de corrección.'],
+      ['Dice «Sin permiso»','El alumno es de otro grupo. Su maestro te puede dar permiso en «Permisos», o pídelo a la dirección.'],
+      ['La cámara no abre','Revisa que el navegador tenga permiso de cámara, o escribe el código que aparece debajo del QR.'],
+      ['¿Qué alumnos veo?','Tu grupo y los hermanos que otros maestros te autorizaron. La dirección ve a toda la escuela.']],
+    video:'videos/maestros.mp4'},
+  dir:{
+    bienvenida:[[I.list,'Alumnos y familias','En «Alumnos» buscas a cualquier alumno, ves su código, su PIN y quién lo puede recoger.'],
+      [I.people,'Maestros','En «Maestros» das de alta al titular y al de jornada ampliada de cada grupo.'],
+      [I.more,'Todo lo demás','En «Más» importas el Excel, ves transporte, permisos, reportes y la hora de salida.']],
+    pasos:[['Importa a los alumnos','Más → Importar alumnos. Descarga la plantilla, llénala y súbela.'],['Da de alta a los maestros','Maestros → Agregar maestro. Comparte su usuario y contraseña.'],
+      ['Entrega PIN a las familias','Cada familia entra con el CURP del hijo mayor y su PIN (aparece en Alumnos).'],['Agrega autorizados','Con la hoja de autorización firmada, abre la ficha del alumno y agrega a las personas con foto.']],
+    faq:[['Un padre olvidó su PIN','Alumnos → ficha del alumno → «PIN al azar» o escribe uno nuevo.'],
+      ['Dos alumnos son hermanos y no aparecen juntos','Ficha del alumno → Hermanos → Agregar hermano(a).'],
+      ['Cambió el transporte de varios alumnos','Corrige la columna en el Excel y vuelve a subirlo: no se duplican alumnos.']],
+    video:''}
 };
 
 /* ---------- Utilidades ---------- */
@@ -298,7 +361,7 @@ function render(){
   if(s){h=`<button class="back" data-a="atras">${I.back} Atrás</button>`+(SUB[s.t]?SUB[s.t](s):'')}
   else{
     const titulo=TABS[ses.rol].find(x=>x[0]===tab)[1];
-    h=`<header class="top"><h1>${esc(titulo)}<small>${esc(ses.nombre)}</small></h1><button class="btn sm" data-a="salir">Salir</button></header>`;
+    h=`<header class="top"><h1>${esc(titulo)}<small>${esc(ses.nombre)}</small></h1><div class="row"><button class="btn sm" data-a="ayuda" aria-label="Ayuda">? Ayuda</button><button class="btn sm" data-a="salir">Salir</button></div></header>`;
     h+=(V[ses.rol+'_'+tab]||(()=>''))();
   }
   app.innerHTML=h;
@@ -312,15 +375,19 @@ const botonConfirmar=(k,etiqueta,accion,attrs,texto,clase='btn full')=>confirmar
 
 function vLogin(){
   const u=esc(leer('usuario_'+rolLogin)||'');
+  const roles=[['padre',I.people,'Papá, mamá o tutor','Para ver el código QR de tus hijos'],['maestro',I.scan,'Maestro(a)','Para entregar a los alumnos'],['dir',I.key,'Dirección','Para administrar la escuela']];
   const campos={
-    padre:`<label class="f" for="lu">CURP de tu hijo(a) mayor<input id="lu" value="${u}" autocomplete="username" autocapitalize="characters" maxlength="18" spellcheck="false"></label><label class="f pass" for="lp">PIN<input id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6"><button type="button" data-a="verpass">Ver</button></label>`,
-    maestro:`<label class="f" for="lu">Usuario<input id="lu" value="${u}" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f pass" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"><button type="button" data-a="verpass">Ver</button></label>`,
+    padre:`<label class="f" for="lu">CURP de tu hijo(a) mayor<input id="lu" value="${u}" autocomplete="username" autocapitalize="characters" maxlength="18" spellcheck="false" placeholder="18 letras y números"><span class="ayudita">Viene en su acta de nacimiento o boleta. Si tienes varios hijos en la escuela, usa el del mayor.</span></label>
+      <label class="f pass" for="lp">PIN<input id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" placeholder="4 números"><button type="button" data-a="verpass">Ver</button></label><span class="ayudita" style="margin-top:-6px">Te lo da la escuela al entregar la hoja de autorización.</span>`,
+    maestro:`<label class="f" for="lu">Usuario<input id="lu" value="${u}" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f pass" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"><button type="button" data-a="verpass">Ver</button></label><span class="ayudita" style="margin-top:-6px">Tu usuario y contraseña te los da la dirección.</span>`,
     dir:`<label class="f" for="lu">Usuario<input id="lu" value="${u}" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="f pass" for="lp">Contraseña<input id="lp" type="password" autocomplete="current-password"><button type="button" data-a="verpass">Ver</button></label>`}[rolLogin];
   return `<div class="login card"><h3>Control de salidas</h3><h1>${esc(ESCUELA)}</h1>
   ${qrPendiente?`<span class="pill" style="align-self:flex-start">Código escaneado: entra como maestro</span>`:''}
-  <div class="tabs3" role="tablist">${[['padre','Padres'],['maestro','Maestros'],['dir','Dirección']].map(([k,l])=>`<button role="tab" aria-selected="${rolLogin===k}" data-lr="${k}">${l}</button>`).join('')}</div>
+  <h2 style="font-size:1rem">¿Quién eres?</h2>
+  <div class="form" role="group">${roles.map(([k,ic,t,d])=>`<button class="rolcard" aria-pressed="${rolLogin===k}" data-lr="${k}">${ic}<span class="grow"><b>${t}</b><span>${d}</span></span></button>`).join('')}</div>
   <form id="f-login" class="form">${campos}<button class="btn pri big full" type="submit">Entrar</button></form>
-  <p class="muted">La sesión queda abierta 30 días en este teléfono. ¿Olvidaste tu PIN o contraseña? Pídelo en la dirección.</p></div>`;
+  <p class="muted">La sesión queda abierta 30 días en este teléfono. ¿Olvidaste tu PIN o contraseña? Pídelo en la dirección.</p>
+  <div class="row"><a class="btn sm grow" href="videos/padres.mp4" target="_blank" rel="noopener">▶ Video para padres</a><a class="btn sm grow" href="videos/maestros.mp4" target="_blank" rel="noopener">▶ Video para maestros</a></div></div>`;
 }
 
 /* ===== Filas de alumnos (maestro) ===== */
@@ -338,7 +405,10 @@ const V={
 padre_hijos(){
   const d=D.padre;if(!d)return cargando;
   if(!d.hijos.length)return '<p class="muted">No hay alumnos activos en tu cuenta.</p>';
-  return d.hijos.map(s=>`<section class="card"><div class="row"><div class="grow"><h2>${esc(s.nombre)}</h2><span class="muted">${esc(s.grupo)} · ${esc(s.maestro)}</span></div>${s.transporte?`<span class="pill">${I.bus}${esc(s.transporte)}</span>`:''}</div>
+  let h=`<section class="card"><h3>Cómo se usa</h3><ol class="pasos"><li><b>Guarda el código</b><span>Toma captura de pantalla o imprímelo. Funciona sin internet.</span></li><li><b>Muéstralo a la salida</b><span>Quien recoja a tu hijo enseña el código al maestro.</span></li></ol></section>`;
+  if(!d.personas.length)h+=`<div class="aviso">${I.people}<div class="grow"><b>Falta decir quién puede recogerlo</b><p class="muted">Sin personas autorizadas el maestro no podrá entregarlo.</p></div><button class="btn sm pri" data-tab="personas">Agregar</button></div>`;
+  if(!d.correo)h+=`<div class="aviso">${I.clock}<div class="grow"><b>Recibe un aviso en cada salida</b><p class="muted">Escribe tu correo en Cuenta.</p></div><button class="btn sm" data-tab="cuenta">Agregar</button></div>`;
+  return h+d.hijos.map(s=>`<section class="card"><div class="row"><div class="grow"><h2>${esc(s.nombre)}</h2><span class="muted">${esc(s.grupo)} · ${esc(s.maestro)}</span></div>${s.transporte?`<span class="pill">${I.bus}${esc(s.transporte)}</span>`:''}</div>
     ${s.hoy?`<p class="pill ok" style="align-self:flex-start;white-space:normal">Hoy salió ${esc(s.hoy.hora)} · ${textoSalida(s.hoy)}</p>`:''}
     <div class="qrwrap"><div class="qr" data-code="${esc(s.qr)}"></div><span class="code muted">${esc(s.qr)}</span>
     <p class="muted">Toma captura, imprímelo o pégalo en la credencial. Cualquier persona autorizada puede mostrarlo.</p></div>
@@ -346,7 +416,7 @@ padre_hijos(){
 },
 padre_personas(){
   const d=D.padre;if(!d)return cargando;
-  return `<section class="card"><p class="muted">Pueden recoger a todos tus hijos. El maestro verá su foto al escanear.</p>
+  return `<section class="card"><h2>¿Quién puede recoger a tus hijos?</h2><p class="muted">El maestro verá la foto al escanear el código. Agrega a todas las personas que pasan por ellos.</p>
   <div class="list">${d.personas.map(p=>`<div class="item">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
   ${confirmar==='p'+p.id?`<button class="btn warn sm" data-a="quitarp" data-id="${p.id}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="p${p.id}">Quitar</button>`}</div>`).join('')||'<p class="muted">Todavía no hay personas. Agrega al menos una.</p>'}</div></section>
   ${formPersona()}`;
@@ -365,6 +435,7 @@ maestro_salidas(){
   const g=d.grupo,fuera=g.filter(a=>a.salida),dentro=g.filter(a=>!a.salida),trans=g.filter(a=>a.transporte),transPend=trans.filter(a=>!a.salida);
   const lista=filtro==='dentro'?dentro:filtro==='fuera'?fuera:g;
   let h=`<button class="btn pri xl full" data-a="camara">${I.scan} Escanear código QR</button>
+  <p class="muted" style="text-align:center"><span class="paso">1</span>Escanea <span class="paso">2</span>Toca la foto <span class="paso">3</span>Registrar salida</p>
   <div class="stats" ${trans.length?'':'style="grid-template-columns:repeat(2,1fr)"'}><div class="stat"><b>${dentro.length}</b><span>En la escuela</span></div><div class="stat"><b>${fuera.length}</b><span>Ya salieron</span></div>${trans.length?`<div class="stat"><b>${trans.length-transPend.length}/${trans.length}</b><span>Transporte</span></div>`:''}</div>`;
   if(d.temprana)h+=`<p class="nota">Antes de las <b>${esc(d.horaSalida)}</b> la salida cuenta como <b>temprana</b> y se pide el motivo.</p>`;
   if(transPend.length){
@@ -487,6 +558,14 @@ function botonRegistrar(){
   return E.transporte?`${I.bus} Entregar al transporte${n>1?' ('+n+' alumnos)':''}`:`Registrar salida${n>1?' de '+n+' alumnos':''}`;
 }
 const SUB={
+ayuda(){
+  const G=GUIAS[ses.rol];
+  return `<h1>Ayuda</h1>
+  <section class="card"><h2>Cómo se usa</h2><ol class="pasos">${G.pasos.map(p=>`<li><b>${esc(p[0])}</b><span>${esc(p[1])}</span></li>`).join('')}</ol></section>
+  ${G.video?`<section class="card"><h2>Video instructivo</h2><video src="${G.video}" controls playsinline preload="metadata" style="width:100%;max-height:70vh;border-radius:12px;background:#000"></video></section>`:''}
+  <section class="card"><h2>Preguntas frecuentes</h2>${G.faq.map(([q,a])=>`<details><summary>${esc(q)}</summary><p class="muted">${esc(a)}</p></details>`).join('')}</section>
+  <button class="btn full" data-a="verguia">Ver otra vez la guía de bienvenida</button>`;
+},
 entrega(){
   if(!E||!E.res)return cargando;
   const r=E.res;
@@ -504,11 +583,11 @@ entrega(){
   if(E.via==='Lista'&&!E.transporte)h+=`<p class="nota">Sin código QR: verifica la identificación de quien recoge.</p>`;
   if(a.transporte)h+=`<div class="seg" role="group" aria-label="Cómo se va">${[['persona','Lo recogen',I.person],['transporte','Transporte · '+a.transporte,I.bus]].map(([k,l,ic])=>`<button aria-pressed="${(k==='transporte')===E.transporte}" data-a="modo" data-val="${k}">${ic}${esc(l)}</button>`).join('')}</div>`;
   if(!E.transporte){
-    h+=r.personas.length?`<section class="card"><h3>¿Quién lo recoge?</h3><div class="pick">${r.personas.map((p,i)=>`<label for="pk${i}"><input type="radio" name="pk" id="pk${i}" value="${p.id}" ${E.persona===p.id?'checked':''}>${av(p.nombre,p.foto,'xl')}<span class="grow"><b>${esc(p.nombre)}</b><br><span class="muted">${esc(p.parentesco)}</span></span></label>`).join('')}</div></section>`
+    h+=r.personas.length?`<section class="card"><h2><span class="paso">1</span>Toca la foto de quien lo recoge</h2><div class="pick">${r.personas.map((p,i)=>`<label for="pk${i}"><input type="radio" name="pk" id="pk${i}" value="${p.id}" ${E.persona===p.id?'checked':''}>${av(p.nombre,p.foto,'xl')}<span class="grow"><b>${esc(p.nombre)}</b><br><span class="muted">${esc(p.parentesco)}</span></span></label>`).join('')}</div></section>`
       :`<section class="card result no"><p>Esta familia no tiene personas autorizadas registradas. Comunícate con la dirección.</p></section>`;
   }
   if(r.hermanos.length){
-    h+=`<section class="card"><h3>Hermanos</h3><div class="pick">${r.hermanos.map(x=>{
+    h+=`<section class="card"><h3>Hermanos · márcalos si salen juntos</h3><div class="pick">${r.hermanos.map(x=>{
       if(x.salida)return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">Ya salió ${esc(x.salida.hora)}</span></span></div>`;
       if(x.permiso==='no')return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">Para entregarlo necesitas permiso de ${esc(x.titular)}</span></span></div>`;
       if(E.transporte&&!x.transporte)return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">No usa transporte</span></span></div>`;
@@ -516,7 +595,7 @@ entrega(){
     }).join('')}</div></section>`;
   }
   if(r.temprana&&!E.transporte){
-    h+=`<section class="card" style="border-color:var(--mark)"><h2>Salida temprana</h2><p class="muted">Es antes de las ${esc(r.horaSalida)}. Elige el motivo:</p>
+    h+=`<section class="card" style="border-color:var(--mark)"><h2><span class="paso">2</span>Salida temprana: elige el motivo</h2><p class="muted">Es antes de las ${esc(r.horaSalida)}.</p>
     <div class="chips envolver">${MOTIVOS.map(m=>`<button aria-pressed="${E.motivo===m}" data-a="motivo" data-val="${esc(m)}">${esc(m)}</button>`).join('')}</div>
     ${E.motivo==='Otro'?`<label class="f" for="motivoOtro">¿Cuál?<input id="motivoOtro" autocomplete="off"></label>`:''}</section>`;
   }
@@ -674,6 +753,22 @@ function vHecho(){
   ${botonConfirmar('deshacer','Me equivoqué: deshacer','deshacer',`data-ids="${x.ids.join(',')}"`,'Se anula la salida y la familia recibe un aviso de corrección.','btn warn full')}`;
 }
 
+/* ---------- Guía de bienvenida (primera vez de cada tipo de usuario) ---------- */
+let guiaPaso=0;
+function mostrarGuia(forzar){
+  if(!ses)return;
+  if(!forzar&&leer('guia_'+ses.rol))return;
+  guiaPaso=0;pintarGuia();$('guia').hidden=false;
+}
+function pintarGuia(){
+  const g=GUIAS[ses.rol].bienvenida,[ic,t,x]=g[guiaPaso],ult=guiaPaso===g.length-1;
+  $('guia').innerHTML=`<div class="caja"><div class="row"><div class="ico">${ic}</div><span class="grow"></span><span class="muted">${guiaPaso+1} de ${g.length}</span></div>
+  <h2 id="guiaTit">${esc(t)}</h2><p>${esc(x)}</p>
+  <div class="puntos">${g.map((_,i)=>`<i class="${i===guiaPaso?'on':''}"></i>`).join('')}</div>
+  <div class="row">${ult?'':`<button class="btn grow" data-a="guiacerrar">Saltar</button>`}<button class="btn pri big grow" data-a="${ult?'guiacerrar':'guiasig'}">${ult?'Empezar':'Siguiente'}</button></div></div>`;
+}
+function cerrarGuia(){$('guia').hidden=true;if(ses)guardar('guia_'+ses.rol,1)}
+
 /* ---------- Escáner (pantalla completa) ---------- */
 async function abrirCamara(){
   const cam=$('cam');cam.hidden=false;document.body.classList.add('noscroll');$('qrin').value='';
@@ -765,6 +860,10 @@ document.addEventListener('click',async e=>{
   const a=b.dataset.a,id=b.dataset.id;if(!a)return;
   switch(a){
     case 'salir':return cerrarSesion();
+    case 'ayuda':return abrir({t:'ayuda'});
+    case 'verguia':return mostrarGuia(true);
+    case 'guiasig':guiaPaso++;return pintarGuia();
+    case 'guiacerrar':return cerrarGuia();
     case 'atras':return atras();
     case 'verpass':{const i=$('lp');i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'Ver':'Ocultar';return}
     case 'cancelar':confirmar=null;return render();
@@ -851,7 +950,7 @@ document.addEventListener('submit',async e=>{
   if(f.id==='f-scan2'){buscar(val('qrin2'));return}
   await hacer(btn,async()=>{
     switch(f.id){
-      case 'f-login':{const r=await api('entrar',rolLogin,val('lu'),val('lp'));guardar('usuario_'+rolLogin,val('lu'));ses=r;guardar('sesion',r);tab='';pila=[];D={};render();await cargar();break}
+      case 'f-login':{const r=await api('entrar',rolLogin,val('lu'),val('lp'));guardar('usuario_'+rolLogin,val('lu'));ses=r;guardar('sesion',r);tab='';pila=[];D={};render();mostrarGuia();await cargar();break}
       case 'f-persona':{const file=$('pf').files[0];if(!file){toast('Agrega la foto del rostro.');return}
         await api('agregarPersona',tok(),{nombre:val('pn'),parentesco:val('pr'),foto:await leerFoto(file),famId:f.dataset.fam||''});toast('Persona agregada.');await recargarTodo();break}
       case 'f-contacto':await api('cambiarContacto',tok(),{correo:val('cc'),telefono:val('ct')});toast('Datos guardados.');await cargar();break;
