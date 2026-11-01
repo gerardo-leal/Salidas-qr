@@ -384,7 +384,7 @@ maestro_permisos(){
   const descr=p=>p.alumno?esc(p.alumno):'Todo el grupo '+esc(p.grupo);
   return `<section class="card"><h2>Hermanos en otros grupos</h2>
   <p class="muted">Si siempre salen juntos, deja que el maestro del hermano los entregue. Es permanente hasta que lo quites.</p>
-  <div class="list">${d.hermanos.map(h=>`<div class="item"><div class="grow"><b>${esc(h.alumno.nombre)}</b><span class="s">Su hermano(a) ${esc(nom1(h.hermano.nombre))} está en ${esc(h.hermano.grupo)} con ${esc(h.maestro.nombre)}</span></div>
+  <div class="list">${d.hermanos.map(h=>`<div class="item"><div class="grow"><b>${esc(h.alumno.nombre)}</b><span class="s">Su hermano(a) ${esc(nom1(h.hermano.nombre))} está en ${esc(h.hermano.grupo)} · ${esc(h.maestro.nombre)}${h.maestro.tipo==='Jornada ampliada'?' (jornada ampliada)':''}</span></div>
     ${h.clave?(confirmar==='q'+h.clave?`<button class="btn warn sm" data-a="quitarpermiso" data-id="${esc(h.clave)}">Quitar</button>`:`<button class="btn sm" data-a="pedir" data-k="q${esc(h.clave)}"><span class="pill ok">Permanente</span></button>`)
       :`<button class="btn pri sm" data-a="permitirhermano" data-m="${h.maestro.id}" data-id="${h.alumno.id}">Permitir a ${esc(nom1(h.maestro.nombre))}</button>`}</div>`).join('')||'<p class="muted">Ningún alumno de tu grupo tiene hermanos en otros grupos.</p>'}</div>
   ${d.hermanos.some(h=>h.clave)?'<p class="muted">Toca <b>Permanente</b> para quitar el permiso.</p>':''}</section>
@@ -426,8 +426,11 @@ dir_escanear(){
 },
 dir_maestros(){
   const d=D.maestros;if(!d)return cargando;
+  const sinMaestro=GRUPOS.filter(g=>!d.some(m=>m.grupo===g));
   return `<button class="btn pri full" data-a="nuevomaestro">+ Agregar maestro</button>
-  <section class="card"><div class="list">${d.map(m=>`<button class="item" data-a="vermaestro" data-id="${m.id}"><span class="av gr" aria-hidden="true">${esc(m.grupo)}</span><span class="grow"><b>${esc(m.nombre)}</b><span class="s">Usuario ${esc(m.usuario)} · Contraseña ${esc(m.contrasena)}</span></span>${I.chev}</button>`).join('')||'<p class="muted">Todavía no hay maestros.</p>'}</div></section>`;
+  <p class="muted">Cada grupo puede tener dos maestros: el titular y el de jornada ampliada.</p>
+  <section class="card"><div class="list">${d.map(m=>`<button class="item" data-a="vermaestro" data-id="${m.id}"><span class="av gr" aria-hidden="true">${esc(m.grupo)}</span><span class="grow"><b>${esc(m.nombre)}</b><span class="s">${esc(m.tipo)} · Usuario ${esc(m.usuario)} · Contraseña ${esc(m.contrasena)}</span></span>${I.chev}</button>`).join('')||'<p class="muted">Todavía no hay maestros. Agrégalos con el botón de arriba.</p>'}</div></section>
+  ${sinMaestro.length&&d.length?`<p class="muted">Grupos sin maestro: ${sinMaestro.join(', ')}</p>`:''}`;
 },
 dir_mas(){
   const item=(a,t,s)=>`<button class="item" data-a="${a}"><span class="grow"><b>${t}</b><span class="s">${s}</span></span>${I.chev}</button>`;
@@ -541,7 +544,13 @@ ficha(s){
   <label class="f" for="fte">Teléfono<input id="fte" type="tel" value="${esc(f.telefono)}"></label>
   <p class="muted">El padre entra con el CURP del hijo mayor inscrito y este PIN.</p>
   <div class="row"><button class="btn pri grow" type="submit">Guardar</button><button class="btn grow" type="button" data-a="pinnuevo" data-id="${esc(f.id)}">PIN al azar</button></div>
-  ${d.hermanos.length?`<h3>Hermanos</h3><div class="list">${d.hermanos.map(h=>`<button class="item" type="button" data-a="ficha" data-id="${h.id}"><span class="grow"><b>${esc(h.nombre)}</b><span class="s">${esc(h.grupo)}</span></span>${I.chev}</button>`).join('')}</div>`:''}</form>
+  </form>
+  <section class="card"><h3>Hermanos</h3>
+  ${d.hermanos.length?`<div class="list">${d.hermanos.map(h=>`<button class="item" type="button" data-a="ficha" data-id="${h.id}"><span class="grow"><b>${esc(h.nombre)}</b><span class="s">${esc(h.grupo)}</span></span>${I.chev}</button>`).join('')}</div>`:'<p class="muted">No tiene hermanos registrados en la escuela.</p>'}
+  <label class="f" for="vhq">Agregar hermano(a)<input id="vhq" type="search" autocomplete="off" placeholder="Busca por nombre o CURP"></label>
+  <div id="vhres" class="list"></div>
+  <p class="muted">Al unirlos comparten cuenta y PIN; el padre entra con el CURP del mayor.</p>
+  ${d.hermanos.length?botonConfirmar('sep','Separar de esta familia','separar',`data-id="${a.id}"`,'Este alumno tendrá su propia cuenta con un PIN nuevo.','btn full'):''}</section>
   <section class="card"><h3>Personas autorizadas</h3><div class="list">${d.personas.map(p=>`<div class="item">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
   ${confirmar==='p'+p.id?`<button class="btn warn sm" data-a="quitarp" data-id="${p.id}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="p${p.id}">Quitar</button>`}</div>`).join('')||'<p class="muted">Sin personas autorizadas. Agrégalas con los datos de la hoja de autorización.</p>'}</div></section>
   ${formPersona(f.id)}
@@ -571,10 +580,11 @@ alta(){
 maestro(s){
   const m=s.id&&D.maestros?D.maestros.find(x=>x.id===s.id):null;
   if(s.id&&!m)return cargando;
-  const libres=GRUPOS.filter(g=>!(D.maestros||[]).some(x=>x.grupo===g&&(!m||x.id!==m.id)));
+  const ocup=g=>(D.maestros||[]).filter(x=>x.grupo===g&&(!m||x.id!==m.id)).map(x=>x.tipo==='Jornada ampliada'?'J. ampliada':'titular');
   return `<h1>${m?'Editar maestro':'Agregar maestro'}</h1><form class="card form" id="f-maestro" data-id="${m?esc(m.id):''}">
   <label class="f" for="mn">Nombre completo<input id="mn" required value="${esc(m?m.nombre:'')}"></label>
-  <label class="f" for="mg">Grupo<select id="mg">${libres.map(g=>`<option ${m&&m.grupo===g?'selected':''}>${g}</option>`).join('')}</select></label>
+  <label class="f" for="mg">Grupo<select id="mg">${GRUPOS.map(g=>{const o=ocup(g);return `<option value="${g}" ${m&&m.grupo===g?'selected':''} ${o.length>=2?'disabled':''}>${g}${o.length?' (ya tiene '+o.join(' y ')+')':''}</option>`}).join('')}</select></label>
+  <label class="f" for="mt">Tipo<select id="mt">${['Titular','Jornada ampliada'].map(t=>`<option ${m&&m.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
   <label class="f" for="mu">Usuario<input id="mu" required autocapitalize="none" spellcheck="false" value="${esc(m?m.usuario:'')}"></label>
   <label class="f" for="mc">Contraseña<input id="mc" value="${esc(m?m.contrasena:'')}" placeholder="Déjala vacía para generar una"></label>
   <label class="f" for="me">Correo<input id="me" type="email" inputmode="email" value="${esc(m?m.correo:'')}"></label>
@@ -788,6 +798,8 @@ document.addEventListener('click',async e=>{
       case 'quitarp':await api('quitarPersona',tok(),id);confirmar=null;toast('Persona quitada.');await recargarTodo();break;
       case 'quitarpermiso':await api('quitarPermiso',tok(),id);confirmar=null;toast('Permiso quitado.');await recargarTodo();break;
       case 'permitirhermano':await api('darPermiso',tok(),{maestroId:b.dataset.m,alumnoId:id,duracion:'siempre'});toast('Listo: puede entregarlo siempre. Lo puedes quitar cuando quieras.');await cargar();break;
+      case 'vincular':{const r=await api('vincularHermano',tok(),sub().id,id);toast(`Unidos como hermanos. La familia usa el PIN ${r.pin}.`);await cargarSub();break}
+      case 'separar':{const r=await api('separarFamilia',tok(),id);confirmar=null;toast('Separado. Su nuevo PIN es '+r.pin+'.');await cargarSub();break}
       case 'pinnuevo':{const p=await api('restablecerPin',tok(),id);toast('PIN nuevo: '+p);await cargarSub();break}
       case 'baja':await api('editarAlumno',tok(),{id,activo:b.dataset.val==='1'});confirmar=null;toast(b.dataset.val==='1'?'Alumno reactivado.':'Alumno dado de baja.');await cargarSub();break;
       case 'delmaestro':await api('guardarMaestro',tok(),{id,eliminar:true});toast('Maestro eliminado.');D.maestros=null;atras();break;
@@ -816,6 +828,9 @@ document.addEventListener('input',e=>{
     const box=$('listaAl');if(!q){box.innerHTML=listaAlumnos(D.lista);if(!D.lista)cargar();return}
     if(q.length<2)return;box.innerHTML=cargando;
     try{const r=await api('buscarAlumnos',tok(),q);if(D.busqueda===q)box.innerHTML=listaAlumnos(r)}catch(err){toast(err.message)}},350)}
+  if(t.id==='vhq'){clearTimeout(tBusca);const q=t.value.trim();tBusca=setTimeout(async()=>{
+    const box=$('vhres');if(q.length<2){box.innerHTML='';return}
+    try{const r=await api('buscarAlumnos',tok(),q);const yo=sub().id;box.innerHTML=r.filter(x=>x.activo&&x.id!==yo).map(x=>`<button class="item" type="button" data-a="vincular" data-id="${x.id}"><span class="grow"><b>${esc(x.nombre)}</b><span class="s">${esc(x.grupo)} · Toca para unirlos como hermanos</span></span></button>`).join('')||'<p class="muted">Sin resultados.</p>'}catch(err){toast(err.message)}},350)}
   if(t.id==='ahq'){clearTimeout(tBusca);const q=t.value.trim();tBusca=setTimeout(async()=>{
     const box=$('ahres');if(q.length<2){box.innerHTML='';return}
     try{const r=await api('buscarAlumnos',tok(),q);box.innerHTML=r.filter(x=>x.activo).map(x=>`<button class="item" type="button" data-a="pickh" data-curp="${esc(x.curp)}" data-n="${esc(x.nombre)}"><span class="grow"><b>${esc(x.nombre)}</b><span class="s">${esc(x.grupo)}</span></span></button>`).join('')||'<p class="muted">Sin resultados.</p>'}catch(err){toast(err.message)}},350)}
@@ -848,7 +863,7 @@ document.addEventListener('submit',async e=>{
       case 'f-familia':await api('editarFamilia',tok(),{id:f.dataset.id,tutor:val('ft'),pin:val('fp'),correo:val('fc'),telefono:val('fte')});toast('Familia actualizada.');await cargarSub();break;
       case 'f-alta':{const r=await api('altaAlumno',tok(),{nombre:val('an'),curp:val('ac'),grupo:val('ag'),transporte:val('atr'),curpHermano:val('ah'),tutor:val('at'),correo:val('ae'),telefono:val('aw')});
         toast(r.hermano?'Alumno agregado a la cuenta de su hermano.':'Alumno dado de alta. PIN de la familia: '+r.pin);grupoSel=val('ag');D.lista=null;D.ficha=null;pila[pila.length-1]={t:'ficha',id:r.id};render();await cargarSub();break}
-      case 'f-maestro':{const r=await api('guardarMaestro',tok(),{id:f.dataset.id||'',nombre:val('mn'),grupo:val('mg'),usuario:val('mu'),contrasena:val('mc'),correo:val('me')});
+      case 'f-maestro':{const r=await api('guardarMaestro',tok(),{id:f.dataset.id||'',nombre:val('mn'),grupo:val('mg'),tipo:val('mt'),usuario:val('mu'),contrasena:val('mc'),correo:val('me')});
         toast('Guardado. Contraseña: '+r.contrasena);D.maestros=await api('listaMaestros',tok());atras();break}
       case 'f-reporte':D.filtro=filtroRep();D.reporte=await api('reporte',tok(),D.filtro);render();break;
       case 'f-clave':await api('cambiarClaveDir',tok(),val('ka'),val('kn'));toast('Contraseña cambiada.');atras();break;

@@ -66,13 +66,15 @@ Las hojas existentes se actualizan solas (se agregan columnas nuevas al final); 
 - **Transporte:** el alumno con ruta asignada (ficha → Transporte escolar, o columna *Transporte* del Excel) se entrega al transporte uno por uno o todo el grupo en bloque. Dirección ve cada ruta en Más → Transporte.
 - **Hermanos:** al escanear a un alumno aparecen sus hermanos para darles salida juntos. En **Permisos**, el maestro puede dejar que el maestro del hermano lo entregue **siempre**; se quita cuando se quiera (lo puede quitar quien lo dio, quien lo recibió o dirección).
 - **Deshacer:** si se registró por error, se anula y la familia recibe un correo de corrección.
-- **Sesión:** queda abierta 30 días en cada teléfono.
+- **Sesión:** queda abierta 30 días en cada teléfono. «Borrar todos los datos» cierra todas las sesiones.
+- **Hermanos en la ficha:** dirección puede unir a dos alumnos como hermanos (misma cuenta y PIN) o separar a uno con su propia cuenta.
+- **Volver a subir el Excel:** los alumnos ya inscritos no se duplican; se actualiza su grupo y transporte.
 
 ## Parte 3 · Empezar a usarla (desde el celular, como dirección)
 
 1. Entra con usuario **direccion** y la contraseña anotada. Cámbiala en **Más → Contraseña**.
 2. **Más → Importar alumnos**: descarga la **plantilla de Excel** (también está en este repositorio: `plantilla-alumnos.xlsx`), llénala en dirección con nombre, grado y grupo, CURP, si se va en transporte y el CURP de sus hermanos, y súbela. Los hermanos quedan en una sola cuenta familiar y cada familia nueva recibe un PIN.
-3. **Maestros → Agregar maestro**: uno por grupo. Comparte a cada uno su usuario y contraseña.
+3. **Maestros → Agregar maestro**: cada grupo puede tener dos maestros, el **titular** y el de **jornada ampliada**. Comparte a cada uno su usuario y contraseña. Los dos ven y entregan a su grupo.
 4. Con las hojas de autorización firmadas: busca al alumno en **Alumnos**, abre su ficha y agrega las **personas autorizadas** con foto (puedes tomarla con el celular).
 5. Entrega a cada familia su CURP de acceso (el del hijo mayor) y su PIN. El padre ve el QR en su cuenta.
 
