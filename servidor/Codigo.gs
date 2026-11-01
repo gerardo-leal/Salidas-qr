@@ -38,7 +38,7 @@ const API = {
   buscarQR, abrirAlumno, registrarSalida, entregarTransporte, deshacerSalida,
   datosMaestro, darPermiso, quitarPermiso, listaPermisos,
   resumenDir, listaGrupo, buscarAlumnos, fichaAlumno, altaAlumno, editarAlumno, fotoAlumno,
-  editarFamilia, restablecerPin, listaMaestros, guardarMaestro, transporteDir, guardarConfig, vincularHermano, separarFamilia,
+  editarFamilia, restablecerPin, listaMaestros, guardarMaestro, transporteDir, guardarConfig, vincularHermano, separarFamilia, borrarDatosDir,
   importarFilas, reporte, exportarExcel, cerrarCicloDir, cambiarClaveDir
 };
 
@@ -1130,6 +1130,14 @@ function cerrarCiclo() {
     });
     return { subieron, egresaron };
   });
+}
+
+// Igual que el menú "Borrar todos los datos", pero desde la dirección (cierra también la sesión actual)
+function borrarDatosDir(token, confirmacion) {
+  sesion(token, ['dir']);
+  if (txt(confirmacion).toUpperCase() !== 'BORRAR') throw new Error('Escribe BORRAR para confirmar.');
+  borrarTodo();
+  return true;
 }
 
 function cerrarCicloDir(token, confirmacion) {
