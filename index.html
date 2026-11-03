@@ -93,6 +93,12 @@ div.item{cursor:default}
 .asis b{font-weight:500;display:block}.asis .s{font-size:.84rem;color:var(--muted);display:block}
 .fotoprev{width:100%;max-width:180px;border-radius:14px;align-self:center;border:2px solid var(--line)}
 .otra{border:2px solid var(--mark)}
+a.btn{text-decoration:none}.btn.wa{color:#128c4a;border-color:#128c4a}.btn.wa svg{width:20px;height:20px}
+a.mini{font-size:.82rem;color:#128c4a;font-weight:600;display:inline-flex;gap:4px;align-items:center}a.mini svg{width:16px;height:16px}
+.barra{height:8px;border-radius:99px;background:var(--bg);overflow:hidden}.barra i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.tblest{width:100%;border-collapse:collapse;font-size:.84rem}.tblest th,.tblest td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}.tblest th:first-child,.tblest td:first-child{text-align:left}
+.tblest th{font-size:.72rem;color:var(--muted);font-weight:600}
+details.gr{border-bottom:1px solid var(--line);padding:8px 0}details.gr summary{cursor:pointer;font-weight:600}
 .grupos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 @media (min-width:560px){.grupos{grid-template-columns:repeat(6,1fr)}}
 .grupos button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:12px;padding:10px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -211,7 +217,9 @@ const I={
   user:svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>'),
   key:svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>'),
   bus:svg('<rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 11h16M8 17v3M16 17v3"/><circle cx="8" cy="14" r=".6"/><circle cx="16" cy="14" r=".6"/>'),
+  wa:svg('<path d="M4 20l1.3-3.9A8 8 0 1112 20a8 8 0 01-4-1.1z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 01-1.8-1.8l.8-1-1-2z"/>'),
   check:svg('<path d="M5 12.5l4.5 4.5L19 7"/>'),
+  chart:svg('<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>'),
   person:svg('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-1a7 7 0 0114 0v1"/>'),
   chev:'<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
   back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>'
@@ -275,6 +283,10 @@ const tok=()=>ses&&ses.token;
 const hoyISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fechaBonita=f=>{if(!f)return'';if(f===hoyISO())return'Hoy';const[y,m,d]=f.split('-');return`${+d}/${+m}/${y}`};
 function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,4000)}
+// WhatsApp con mensaje listo (gratis: abre WhatsApp en el teléfono de quien lo toca)
+const telWA=t=>{let d=String(t||'').replace(/\D/g,'');if(d.length===10)d='52'+d;return d.length>=12?d:''};
+const waLink=(tel,msg)=>{const n=telWA(tel);return n?'https://wa.me/'+n+'?text='+encodeURIComponent(msg):''};
+const botonWA=(tel,msg,etq='Avisar por WhatsApp',clase='btn full')=>{const u=waLink(tel,msg);return u?`<a class="${clase} wa" href="${u}" target="_blank" rel="noopener">${I.wa}${etq}</a>`:''};
 const qrUrl=c=>location.origin+location.pathname+'?qr='+encodeURIComponent(c);
 const pillTipo=t=>t==='Temprana'?'<span class="pill warn">Temprana</span>':t==='Transporte'?`<span class="pill">${I.bus}Transporte</span>`:t==='No autorizado'?'<span class="pill bad">No autorizado</span>':'';
 const textoSalida=s=>s.tipo==='Transporte'?`Subió al ${esc(s.recogio).replace('Transporte','transporte')}`:`Con ${esc(s.recogio)}${s.parentesco?' ('+esc(s.parentesco)+')':''}`;
@@ -358,6 +370,8 @@ async function cargarSub(){
     if(s.t==='transporte')D.trans=await api('transporteDir',tok());
     if(s.t==='permisosDir')D.perm=await api('listaPermisos',tok());
     if(s.t==='horario'&&!D.resumen)D.resumen=await api('resumenDir',tok());
+    if(s.t==='acuerdos')D.acu=await api('sinAcuerdo',tok());
+    if(s.t==='estadisticas')D.est=await api('estadisticas',tok(),D.estF||{});
   }catch(e){toast(e.message);return}
   if(sub()===s)render();
 }
@@ -474,7 +488,7 @@ maestro_asistencia(){
   const fila=a=>{
     if(a.salida)return `<div class="asis"><div class="row"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${textoSalida(a.salida)}</span></span><span class="pill ok">Salió ${esc(a.salida.hora)}</span></div></div>`;
     const ops=a.ruta?[['','Presente',''],['Faltó','Faltó','falta'],['Recogen','Lo recogen','trans']]:[['','Presente',''],['Faltó','Faltó','falta'],['Transporte','Transporte','trans']];
-    const sub=a.asistencia==='Faltó'?'Faltó · su familia recibe un aviso':a.transporte?`Se va en ${esc(a.transporte)}`:a.ruta?`Hoy lo recogen (normalmente ${esc(a.ruta)})`:'Lo recogen';
+    const sub=a.asistencia==='Faltó'?'Faltó · su familia recibe un correo'+(waLink(a.telefono,'x')?` · <a class="mini" href="${waLink(a.telefono,`${ESCUELA}: hoy ${a.nombre} (${a.grupo}) no se presentó a clases. Si salió de casa hacia la escuela, comuníquese de inmediato con nosotros.`)}" target="_blank" rel="noopener">${I.wa}WhatsApp</a>`:''):a.transporte?`Se va en ${esc(a.transporte)}`:a.ruta?`Hoy lo recogen (normalmente ${esc(a.ruta)})`:'Lo recogen';
     let h=`<div class="asis"><span><b>${esc(a.nombre)}</b><span class="s">${sub}</span></span>
     <div class="seg tres" role="group" aria-label="Asistencia de ${esc(nom1(a.nombre))}">${ops.map(([k,l,c])=>`<button class="${c}" aria-pressed="${(a.asistencia||'')===k}" data-a="asis" data-id="${a.id}" data-val="${k}">${l}</button>`).join('')}</div>`;
     if(confirmar==='ruta'+a.id)h+=`<div class="row"><select id="ruta${a.id}" class="grow" aria-label="Ruta">${(d.rutas.length?d.rutas:['Transporte']).map(r=>`<option>${esc(r)}</option>`).join('')}</select><button class="btn pri sm" data-a="asisruta" data-id="${a.id}">Guardar</button><button class="btn sm" data-a="cancelar">Cancelar</button></div>`;
@@ -514,6 +528,8 @@ dir_inicio(){
   return `<div class="stats"><div class="stat"><b>${d.total}</b><span>Alumnos</span></div><div class="stat"><b>${d.salidasHoy}</b><span>Salidas hoy</span></div><div class="stat"><b>${d.transporte.entregados}/${d.transporte.total}</b><span>Transporte</span></div></div>
   ${d.sinPersonas?`<section class="card" style="border-color:var(--mark)"><p><b>${d.sinPersonas} alumnos</b> no tienen personas autorizadas. Agrégalas desde la ficha de cada alumno.</p></section>`:''}
   <div class="acciones"><button class="btn pri" data-a="alta">+ Alumno</button><button class="btn" data-a="importar">Importar Excel</button><button class="btn" data-a="transporteDir">${I.bus} Transporte</button><button class="btn" data-a="permisosDir">${I.key} Permisos</button></div>
+  ${vSinRecoger(d.sinRecoger)}
+  ${d.sinAcuerdo?`<div class="aviso">${I.list}<div class="grow"><b>${d.sinAcuerdo} ${d.sinAcuerdo===1?'familia no ha':'familias no han'} entregado el acuerdo firmado</b><p class="muted">Márcalo al recibirlo.</p></div><button class="btn sm pri" data-a="acuerdos">Ver</button></div>`:''}
   ${d.noAutorizados?`<section class="card" style="border-color:var(--bad)"><p><b>${d.noAutorizados} ${d.noAutorizados===1?'salida':'salidas'} con persona no autorizada hoy.</b> Revísalas en Últimas salidas o en Reportes.</p></section>`:''}
   <p class="muted">Hora de salida: <b>${esc(d.horaSalida)}</b> · Faltaron hoy: <b>${d.faltas}</b> · Tempranas: <b>${d.tempranas}</b> · Permisos permanentes: <b>${d.permanentes}</b></p>
   <section class="card"><h3>Salidas de hoy por grupo</h3><div class="grupos">${d.grupos.map(g=>`<button data-a="vergrupo" data-g="${g}"><b>${g}</b><span>${d.conteo[g].salidas}/${d.conteo[g].alumnos-d.conteo[g].faltas}${d.conteo[g].faltas?' · '+d.conteo[g].faltas+(d.conteo[g].faltas===1?' falta':' faltas'):''}</span></button>`).join('')}</div></section>
@@ -546,15 +562,27 @@ dir_mas(){
   ${item('permisosDir','Permisos entre maestros','Ver, dar y quitar permisos de hoy o permanentes')}
   ${item('horario','Hora de salida','Antes de esa hora la salida cuenta como temprana')}
   ${item('importar','Importar alumnos desde Excel','Descarga la plantilla, llénala y súbela')}
+  ${item('estadisticas','Estadísticas','Asistencia por grupo, tipos de salida y motivos')}
+  ${item('acuerdos','Acuerdos firmados','Familias que faltan de entregar el acuerdo')}
   ${item('reportes','Reportes de salidas','Por día, grupo, alumno o tipo; descarga en Excel')}
   ${item('clave','Contraseña de dirección','Cámbiala periódicamente')}
   ${item('ciclo','Cerrar ciclo escolar','Sube a todos de grado y archiva el historial')}
   </div></section>
   <a class="btn full" href="acuerdo-padres.pdf" target="_blank" rel="noopener">Acuerdo para padres (PDF para imprimir y firmar)</a>
+  ${D.resumen?`<p class="muted">Último respaldo de la base de datos: <b>${esc(D.resumen.ultimoRespaldo||'todavía no hay')}</b>${D.resumen.ultimoRespaldo?'':' · se activa desde la hoja: menú Salidas QR → Activar respaldo semanal'}.</p>`:''}
   ${D.resumen&&D.resumen.hojaUrl?`<a class="btn full" href="${esc(D.resumen.hojaUrl)}" target="_blank" rel="noopener">Abrir base de datos en Drive</a>`:''}`;
 }
 };
 
+function vSinRecoger(l){
+  if(!l)return '';
+  if(!l.length)return `<section class="card" style="border-color:var(--ok)"><p><b>Todos los alumnos ya salieron.</b></p></section>`;
+  const g={};l.forEach(a=>(g[a.grupo]=g[a.grupo]||[]).push(a));
+  return `<section class="card" style="border-color:var(--bad)"><div class="row"><h2 class="grow">Siguen en la escuela</h2><span class="pill bad">${l.length}</span></div>
+  <p class="muted">Ya pasó la hora de salida y no tienen salida registrada (los que faltaron no cuentan).</p>
+  ${Object.keys(g).map(k=>`<details class="gr" ${l.length<=8?'open':''}><summary>${esc(k)} · ${g[k].length}</summary><div class="list">${g[k].map(a=>`<div class="item"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${a.transporte?I.bus.replace('<svg','<svg width="14" height="14" style="vertical-align:-2px"')+' '+esc(a.transporte)+' · ':''}${esc(a.tutor||'Sin tutor')}${a.telefono?` · <a href="tel:${esc(a.telefono)}">${esc(a.telefono)}</a>`:''}</span>
+    ${waLink(a.telefono,'x')?`<a class="mini" href="${waLink(a.telefono,`${ESCUELA}: ${a.nombre} (${a.grupo}) sigue en la escuela. Por favor pase a recogerlo(a) o avísenos quién vendrá.`)}" target="_blank" rel="noopener">${I.wa}WhatsApp</a>`:''}</span></div>`).join('')}</div></details>`).join('')}</section>`;
+}
 function segDuracion(){
   return `<div><h3 style="margin-bottom:6px">¿Por cuánto tiempo?</h3><div class="seg" role="group">${[['hoy','Solo hoy'],['siempre','Siempre']].map(([k,l])=>`<button type="button" aria-pressed="${permDur===k}" data-a="dur" data-val="${k}">${l}</button>`).join('')}</div>
   <p class="muted" style="margin-top:6px">${permDur==='siempre'?'Queda activo hasta que alguien lo quite.':'Se quita solo al terminar el día.'}</p></div>`;
@@ -566,7 +594,7 @@ function filaPermiso(p,titulo,detalle){
 function listaAlumnos(l){
   if(!l)return cargando;
   if(!l.length)return '<p class="muted">No hay alumnos aquí. Dalos de alta o impórtalos desde Excel.</p>';
-  return `<div class="list">${l.map(a=>`<button class="item" data-a="ficha" data-id="${a.id}"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${a.grupo?esc(a.grupo)+' · ':''}${a.tutor!==undefined?'Tutor: '+esc(a.tutor)+' · PIN '+esc(a.pin):(a.activo===false?'Dado de baja':'')}</span></span>${a.transporte?`<span class="pill">${I.bus}${esc(a.transporte)}</span>`:''}${I.chev}</button>`).join('')}</div>`;
+  return `<div class="list">${l.map(a=>`<button class="item" data-a="ficha" data-id="${a.id}"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${a.grupo?esc(a.grupo)+' · ':''}${a.tutor!==undefined?'Tutor: '+esc(a.tutor)+' · PIN '+esc(a.pin):(a.activo===false?'Dado de baja':'')}</span></span>${a.acuerdo===false?'<span class="pill gris">Sin acuerdo</span>':''}${a.transporte?`<span class="pill">${I.bus}${esc(a.transporte)}</span>`:''}${I.chev}</button>`).join('')}</div>`;
 }
 function formPersona(famId){
   return `<form class="card form" id="f-persona" ${famId?`data-fam="${esc(famId)}"`:''}><h3>Agregar persona autorizada</h3>
@@ -679,6 +707,8 @@ ficha(s){
   <label class="f" for="fp">PIN de acceso<input id="fp" value="${esc(f.pin)}" inputmode="numeric" maxlength="6"></label>
   <label class="f" for="fc">Correo para avisos<input id="fc" type="email" inputmode="email" value="${esc(f.correo)}"></label>
   <label class="f" for="fte">Teléfono<input id="fte" type="tel" value="${esc(f.telefono)}"></label>
+  <label class="chk" for="fac"><input type="checkbox" id="fac" ${f.acuerdo?'checked':''}><span class="grow"><b>Entregó el acuerdo firmado</b><br><span class="muted">${f.acuerdo?'Recibido el '+esc(fechaBonita(f.acuerdo)):'Protocolo de entrega y aviso de privacidad'}</span></span></label>
+  <label class="f" for="fes">Uso con fines estadísticos<select id="fes">${[['','Sin respuesta'],['Sí','Sí acepta'],['No','No acepta']].map(([k,l])=>`<option value="${k}" ${f.estadistica===k?'selected':''}>${l}</option>`).join('')}</select></label>
   <p class="muted">El padre entra con el CURP del hijo mayor inscrito y este PIN.</p>
   <div class="row"><button class="btn pri grow" type="submit">Guardar</button><button class="btn grow" type="button" data-a="pinnuevo" data-id="${esc(f.id)}">PIN al azar</button></div>
   </form>
@@ -783,6 +813,31 @@ reportes(){
   <div class="row"><button class="btn pri grow" type="submit">Ver</button><button class="btn grow" type="button" data-a="excel">Descargar Excel</button></div></form>
   ${D.reporte?`<section class="card"><h3>${D.reporte.length} salidas</h3>${listaSalidas(D.reporte.slice(0,200),'Sin salidas con esos filtros.')}${D.reporte.length>200?'<p class="muted">Se muestran las 200 más recientes. Descarga el Excel para verlas todas.</p>':''}</section>`:''}`;
 },
+acuerdos(){
+  const l=D.acu;if(!l)return cargando;
+  return `<h1>Acuerdos firmados</h1><a class="btn full" href="acuerdo-padres.pdf" target="_blank" rel="noopener">Imprimir el acuerdo (PDF)</a>
+  <section class="card"><div class="row"><h2 class="grow">Faltan de entregar</h2><span class="pill ${l.length?'bad':'ok'}">${l.length}</span></div>
+  <p class="muted">Cuando la familia entregue el acuerdo, toca según lo que marcó en «Uso con fines estadísticos».</p>
+  <div class="list">${l.map(f=>`<div class="asis"><span><b>${esc(f.mayor.nombre)}</b><span class="s">${esc(f.mayor.grupo)} · ${esc(f.tutor||'Sin tutor')}${f.hijos.length>1?' · Hermanos: '+esc(f.hijos.slice(1).join(', ')):''}</span></span>
+    <div class="row"><button class="btn pri sm grow" data-a="acuok" data-id="${esc(f.id)}" data-val="Sí">Entregó · acepta estadística</button><button class="btn sm grow" data-a="acuok" data-id="${esc(f.id)}" data-val="No">Entregó · no acepta</button></div></div>`).join('')||'<p class="muted">Todas las familias ya entregaron su acuerdo.</p>'}</div></section>`;
+},
+estadisticas(){
+  const e=D.est,f=D.estF||{};
+  let h=`<h1>Estadísticas</h1><form class="card form" id="f-est"><div class="row"><label class="f grow" for="ed">Desde<input id="ed" type="date" value="${esc(f.desde||(e&&e.desde)||'')}"></label><label class="f grow" for="eh">Hasta<input id="eh" type="date" value="${esc(f.hasta||(e&&e.hasta)||'')}"></label></div><button class="btn pri full" type="submit">Ver</button></form>`;
+  if(!e)return h+cargando;
+  const pct=(n,t)=>t?Math.round(100*n/t):0,tot=e.salidas;
+  const tipos=['Normal','Temprana','Transporte','No autorizado'].map(t=>[t,e.porTipo[t]||0]);
+  const barras=(rows,t)=>rows.map(([k,n])=>`<div><div class="row"><span class="grow">${esc(k)}</span><b>${n}</b><span class="muted" style="width:3em;text-align:right">${pct(n,t)}%</span></div><div class="barra"><i style="width:${pct(n,t)}%"></i></div></div>`).join('');
+  h+=`<div class="stats"><div class="stat"><b>${e.asistencia==null?'—':e.asistencia+'%'}</b><span>Asistencia</span></div><div class="stat"><b>${e.faltas}</b><span>Faltas</span></div><div class="stat"><b>${e.dias}</b><span>Días con registro</span></div></div>
+  <section class="card"><h3>Por grupo</h3><div class="tbl"><table class="tblest"><thead><tr><th>Grupo</th><th>Alumnos</th><th>Asist.</th><th>Faltas</th><th>Tempr.</th><th>No aut.</th><th>Transp.</th></tr></thead><tbody>
+  ${e.porGrupo.map(g=>`<tr><td><b>${esc(g.grupo)}</b></td><td>${g.alumnos}</td><td>${g.asistencia==null?'—':g.asistencia+'%'}</td><td>${g.faltas}</td><td>${g.tempranas}</td><td>${g.noAutorizados}</td><td>${g.transporte}</td></tr>`).join('')}</tbody></table></div></section>
+  <section class="card form"><h3>Salidas por tipo · ${tot}</h3>${barras(tipos,tot)}</section>`;
+  const mot=Object.entries(e.motivos).sort((a,b)=>b[1]-a[1]),nm=mot.reduce((s,x)=>s+x[1],0);
+  if(nm)h+=`<section class="card form"><h3>Motivos de salida temprana</h3>${barras(mot,nm)}</section>`;
+  const hr=Object.entries(e.horas).sort(),nh=hr.reduce((s,x)=>s+x[1],0);
+  if(nh)h+=`<section class="card form"><h3>Hora en que recogen (salidas normales)</h3>${barras(hr.map(([k,n])=>[k+' a '+k.slice(0,4)+'9',n]),nh)}</section>`;
+  return h+`<p class="muted">Acuerdos firmados: <b>${e.acuerdos.firmados} de ${e.acuerdos.total}</b> familias. La asistencia se calcula con el pase de lista de los días con registro.${e.excluidos?` No se incluyen ${e.excluidos} alumnos cuyas familias no aceptaron el uso estadístico.`:''} Todos los datos son agrupados: no identifican a ningún alumno.</p>`;
+},
 clave(){
   return `<h1>Contraseña de dirección</h1><form class="card form" id="f-clave">
   <label class="f" for="ka">Contraseña actual<input id="ka" type="password" autocomplete="current-password"></label>
@@ -806,7 +861,8 @@ function vHecho(){
   <div class="horag">${esc(x.hora)}</div>
   <p>${esc(lista)} · ${x.tipo==='Transporte'?esc(x.recogio):'con '+esc(x.recogio)} ${pillTipo(x.tipo)}</p>
   ${x.tipo==='No autorizado'?'<p class="muted">Se guardaron la foto y los datos de quien recogió. La dirección lo verá en el reporte del día.</p>':''}
-  <p class="muted">Correo a la familia: ${esc(x.correo)}</p></section>
+  <p class="muted">Correo a la familia: ${esc(x.correo)}</p>
+  ${E.res&&E.res.familia?botonWA(E.res.familia.telefono,`${ESCUELA}: ${lista} ${x.alumnos.length>1?'salieron':'salió'} hoy a las ${x.hora} ${x.tipo==='Transporte'?'en el '+x.recogio.replace('Transporte','transporte'):'con '+x.recogio}.`,'Avisar también por WhatsApp'):''}</section>
   <button class="btn pri xl full" data-a="siguiente">${I.scan} Escanear siguiente</button>
   <button class="btn big full" data-a="atras">${ses.rol==='maestro'?'Volver a mi grupo':'Listo'}</button>
   ${botonConfirmar('deshacer','Me equivoqué: deshacer','deshacer',`data-ids="${x.ids.join(',')}"`,'Se anula la salida y la familia recibe un aviso de corrección.','btn warn full')}`;
@@ -941,6 +997,8 @@ document.addEventListener('click',async e=>{
     case 'alta':return abrir({t:'alta'});
     case 'importar':D.imp=null;return abrir({t:'importar'});
     case 'reportes':return abrir({t:'reportes'});
+    case 'acuerdos':D.acu=null;return abrir({t:'acuerdos'});
+    case 'estadisticas':D.est=null;return abrir({t:'estadisticas'});
     case 'clave':return abrir({t:'clave'});
     case 'ciclo':return abrir({t:'ciclo'});
     case 'horario':return abrir({t:'horario'});
@@ -966,6 +1024,7 @@ document.addEventListener('click',async e=>{
       case 'asisruta':{const ruta=val('ruta'+id),al=D.maestro.grupo.find(x=>x.id===id);await api('marcarAsistencia',tok(),[id],'Transporte',ruta);
         al.asistencia='Transporte';al.transporte=al.ruta||ruta;confirmar=null;D.maestro.listaPasada=true;toast(nom1(al.nombre)+' se va hoy en '+al.transporte+'.');render();break}
       case 'quitarfalta':await api('marcarAsistencia',tok(),[id],'');toast('Falta quitada. Ya puedes darle salida.');E.res=null;render();await cargarSub();if(D.maestro)cargar();break;
+      case 'acuok':{await api('editarFamilia',tok(),{id,acuerdo:true,estadistica:b.dataset.val});D.acu=D.acu.filter(x=>x.id!==id);if(D.resumen)D.resumen.sinAcuerdo=Math.max(0,D.resumen.sinAcuerdo-1);toast('Acuerdo registrado.');render();break}
       case 'quitarp':await api('quitarPersona',tok(),id);confirmar=null;toast('Persona quitada.');await recargarTodo();break;
       case 'quitarpermiso':await api('quitarPermiso',tok(),id);confirmar=null;toast('Permiso quitado.');await recargarTodo();break;
       case 'permitirhermano':await api('darPermiso',tok(),{maestroId:b.dataset.m,alumnoId:id,duracion:'siempre'});toast('Listo: puede entregarlo siempre. Lo puedes quitar cuando quieras.');await cargar();break;
@@ -1036,11 +1095,12 @@ document.addEventListener('submit',async e=>{
       case 'f-permdir':await api('darPermiso',tok(),{maestroId:val('pdm'),grupo:val('pdg'),duracion:permDur});toast('Permiso dado.');await cargarSub();break;
       case 'f-horario':{const r=await api('guardarConfig',tok(),{horaSalida:val('hs')});D.resumen&&(D.resumen.horaSalida=r.horaSalida);toast('Hora de salida: '+r.horaSalida);atras();break}
       case 'f-alumno':await api('editarAlumno',tok(),{id:sub().id,nombre:val('en'),curp:val('ec'),grupo:val('eg'),transporte:val('etr')});toast('Cambios guardados.');D.lista=null;await cargarSub();break;
-      case 'f-familia':await api('editarFamilia',tok(),{id:f.dataset.id,tutor:val('ft'),pin:val('fp'),correo:val('fc'),telefono:val('fte')});toast('Familia actualizada.');await cargarSub();break;
+      case 'f-familia':await api('editarFamilia',tok(),{id:f.dataset.id,tutor:val('ft'),pin:val('fp'),correo:val('fc'),telefono:val('fte'),acuerdo:$('fac').checked,estadistica:val('fes')});toast('Familia actualizada.');await cargarSub();break;
       case 'f-alta':{const r=await api('altaAlumno',tok(),{nombre:val('an'),curp:val('ac'),grupo:val('ag'),transporte:val('atr'),curpHermano:val('ah'),tutor:val('at'),correo:val('ae'),telefono:val('aw')});
         toast(r.hermano?'Alumno agregado a la cuenta de su hermano.':'Alumno dado de alta. PIN de la familia: '+r.pin);grupoSel=val('ag');D.lista=null;D.ficha=null;pila[pila.length-1]={t:'ficha',id:r.id};render();await cargarSub();break}
       case 'f-maestro':{const r=await api('guardarMaestro',tok(),{id:f.dataset.id||'',nombre:val('mn'),grupo:val('mg'),tipo:val('mt'),usuario:val('mu'),contrasena:val('mc'),correo:val('me')});
         toast('Guardado. Contraseña: '+r.contrasena);D.maestros=await api('listaMaestros',tok());atras();break}
+      case 'f-est':D.estF={desde:val('ed'),hasta:val('eh')};D.est=null;render();D.est=await api('estadisticas',tok(),D.estF);render();break;
       case 'f-reporte':D.filtro=filtroRep();D.reporte=await api('reporte',tok(),D.filtro);render();break;
       case 'f-clave':await api('cambiarClaveDir',tok(),val('ka'),val('kn'));toast('Contraseña cambiada.');atras();break;
       case 'f-ciclo':{const r=await api('cerrarCicloDir',tok(),val('cic'));toast(`Ciclo cerrado: ${r.subieron} subieron de grado, ${r.egresaron} egresaron.`);atras();break}

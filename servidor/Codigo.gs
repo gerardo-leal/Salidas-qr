@@ -8,14 +8,15 @@
  */
 
 const TZ = 'America/Monterrey';
-const VERSION = 4;
+const VERSION = 5;
 const TIPOS_MAESTRO = ['Titular', 'Jornada ampliada'];
 const HORA_SALIDA_DEFAULT = '14:30';
 const DIAS_SESION = 30;
 // Las columnas nuevas siempre van al final: así las hojas existentes se actualizan solas.
 const HOJAS = {
   Alumnos:  ['ID', 'Nombre', 'CURP', 'Grupo', 'QR', 'FamiliaID', 'Activo', 'FotoID', 'Transporte'],
-  Familias: ['ID', 'Tutor', 'PIN', 'Telefono', 'Correo'],
+  // Acuerdo: fecha en que entregó el acuerdo firmado. Estadistica: 'No' si no aceptó el uso estadístico.
+  Familias: ['ID', 'Tutor', 'PIN', 'Telefono', 'Correo', 'Acuerdo', 'Estadistica'],
   Personas: ['ID', 'FamiliaID', 'Nombre', 'Parentesco', 'FotoID'],
   // Tipo: 'Titular' o 'Jornada ampliada' (máximo uno de cada tipo por grupo)
   Maestros: ['ID', 'Nombre', 'Grupo', 'Usuario', 'Contrasena', 'Correo', 'Tipo'],
@@ -28,7 +29,7 @@ const HOJAS = {
   Config:   ['Clave', 'Valor']
 };
 const TEXTO = {
-  Alumnos: ['CURP', 'Grupo'], Familias: ['PIN', 'Telefono'], Maestros: ['Contrasena'],
+  Alumnos: ['CURP', 'Grupo'], Familias: ['PIN', 'Telefono', 'Acuerdo'], Maestros: ['Contrasena'],
   Salidas: ['Fecha', 'Hora', 'Telefono'], Asistencia: ['Fecha', 'Hora'], Permisos: ['Fecha'], Config: ['Valor']
 };
 const GRUPOS = ['1°A','1°B','2°A','2°B','3°A','3°B','4°A','4°B','5°A','5°B','6°A','6°B'];
@@ -43,7 +44,7 @@ const API = {
   datosPadre, cambiarQR, cambiarPin, cambiarContacto, agregarPersona, quitarPersona,
   buscarQR, abrirAlumno, registrarSalida, entregarTransporte, deshacerSalida, marcarAsistencia,
   datosMaestro, darPermiso, quitarPermiso, listaPermisos,
-  resumenDir, listaGrupo, buscarAlumnos, fichaAlumno, altaAlumno, editarAlumno, fotoAlumno,
+  resumenDir, sinAcuerdo, estadisticas, listaGrupo, buscarAlumnos, fichaAlumno, altaAlumno, editarAlumno, fotoAlumno,
   editarFamilia, restablecerPin, listaMaestros, guardarMaestro, transporteDir, guardarConfig, vincularHermano, separarFamilia, borrarDatosDir,
   importarFilas, reporte, exportarExcel, cerrarCicloDir, cambiarClaveDir
 };
@@ -127,7 +128,37 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('Salidas QR')
     .addItem('Cargar datos de prueba', 'cargarDatosDePrueba')
     .addItem('Borrar todos los datos', 'borrarTodo')
+    .addSeparator()
+    .addItem('Activar respaldo semanal', 'activarRespaldo')
+    .addItem('Hacer un respaldo ahora', 'respaldar')
     .addToUi();
+}
+
+/* ================= RESPALDO ================= */
+const RESPALDOS_GUARDADOS = 8;
+
+// Copia completa de la hoja en la carpeta "Salidas QR - Respaldos". Guarda las últimas 8.
+function respaldar() {
+  const ss = SpreadsheetApp.getActive();
+  let id = cfg('carpeta_respaldos'), carpeta;
+  try { carpeta = id && DriveApp.getFolderById(id); } catch (e) { carpeta = null; }
+  if (!carpeta) { carpeta = DriveApp.createFolder('Salidas QR - Respaldos'); setCfg('carpeta_respaldos', carpeta.getId()); }
+  const copia = DriveApp.getFileById(ss.getId()).makeCopy('Respaldo Salidas QR ' + hoy() + ' ' + ahora().replace(':', ''), carpeta);
+  const lista = [];
+  const it = carpeta.getFiles();
+  while (it.hasNext()) lista.push(it.next());
+  lista.sort((a, b) => b.getDateCreated() - a.getDateCreated()).slice(RESPALDOS_GUARDADOS).forEach(f => f.setTrashed(true));
+  setCfg('ultimo_respaldo', hoy() + ' ' + ahora());
+  avisar('Respaldo guardado en Drive: ' + copia.getName());
+  return copia.getName();
+}
+
+// Programa un respaldo cada domingo a las 11 p. m. (se corre una vez desde el menú)
+function activarRespaldo() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'respaldar').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('respaldar').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(23).create();
+  respaldar();
+  avisar('Respaldo semanal activado: cada domingo en la noche. Ya se hizo el primero.');
 }
 
 /* ================= DATOS DE PRUEBA ================= */
@@ -790,10 +821,11 @@ function datosMaestro(token) {
   const yo = maestroDeSesion(s, maestros);
   const alumnos = filas('Alumnos').filter(a => a.Activo !== 'NO');
   const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
-  const permisos = permisosActivos(), asis = asistenciaHoy();
+  const permisos = permisosActivos(), asis = asistenciaHoy(), telDe = {};
+  filas('Familias').forEach(f => { telDe[f.ID] = f.Telefono || ''; });
   const item = a => {
     const x = salHoy.filter(y => y.AlumnoID === a.ID).pop();
-    return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: transporteHoy(a, asis), ruta: a.Transporte, asistencia: estadoHoy(a, asis),
+    return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: transporteHoy(a, asis), ruta: a.Transporte, asistencia: estadoHoy(a, asis), telefono: telDe[a.FamiliaID],
       salida: x ? Object.assign(salidaCorta(x), { mia: x.Entrego === yo.Nombre }) : null };
   };
   const mios = alumnos.filter(a => a.Grupo === yo.Grupo).sort(porNombre);
@@ -911,6 +943,9 @@ function resumenDir(token) {
     tempranas: salidasHoy.filter(x => x.Tipo === 'Temprana').length,
     faltas: alumnos.filter(faltan).length,
     noAutorizados: salidasHoy.filter(x => x.Tipo === 'No autorizado').length,
+    sinRecoger: sinRecoger(alumnos, salidasHoy, asis),
+    sinAcuerdo: familiasSinAcuerdo(alumnos).length,
+    ultimoRespaldo: cfg('ultimo_respaldo'),
     permanentes: permisosActivos().filter(p => p.Duracion === 'siempre').length,
     horaSalida: horaSalida(),
     ultimas: salidasHoy.slice(-8).reverse().map(salidaCorta),
@@ -920,12 +955,77 @@ function resumenDir(token) {
   };
 }
 
+// Después de la hora de salida: alumnos presentes que no tienen salida registrada
+function sinRecoger(alumnos, salidasHoy, asis) {
+  if (ahora() < horaSalida()) return null;
+  const familias = filas('Familias');
+  return alumnos.filter(a => estadoHoy(a, asis) !== 'Faltó' && !salidasHoy.some(x => x.AlumnoID === a.ID))
+    .sort((a, b) => GRUPOS.indexOf(a.Grupo) - GRUPOS.indexOf(b.Grupo) || porNombre(a, b))
+    .map(a => { const f = familias.find(x => x.ID === a.FamiliaID) || {};
+      return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, transporte: transporteHoy(a, asis), tutor: f.Tutor || '', telefono: f.Telefono || '' }; });
+}
+
+// Familias con algún hijo activo que no han entregado el acuerdo firmado
+function familiasSinAcuerdo(alumnos) {
+  const familias = filas('Familias');
+  const ids = {};
+  alumnos.forEach(a => { ids[a.FamiliaID] = 1; });
+  return familias.filter(f => ids[f.ID] && !f.Acuerdo);
+}
+
+function sinAcuerdo(token) {
+  sesion(token, ['dir']);
+  const alumnos = filas('Alumnos').filter(a => a.Activo !== 'NO');
+  return familiasSinAcuerdo(alumnos).map(f => {
+    const hijos = alumnos.filter(a => a.FamiliaID === f.ID).sort((a, b) => grado(b.Grupo) - grado(a.Grupo));
+    return { id: f.ID, tutor: f.Tutor, telefono: f.Telefono, mayor: { id: hijos[0].ID, nombre: hijos[0].Nombre, grupo: hijos[0].Grupo },
+      hijos: hijos.map(h => h.Nombre.split(' ')[0] + ' (' + h.Grupo + ')') };
+  }).sort((a, b) => GRUPOS.indexOf(a.mayor.grupo) - GRUPOS.indexOf(b.mayor.grupo) || a.mayor.nombre.localeCompare(b.mayor.nombre));
+}
+
+/*
+ * Estadísticas del periodo (por defecto, el mes actual). Solo números agrupados.
+ * No incluye a los alumnos de familias que no aceptaron el uso estadístico.
+ */
+function estadisticas(token, f) {
+  sesion(token, ['dir']);
+  f = f || {};
+  const desde = txt(f.desde) || hoy().slice(0, 8) + '01', hasta = txt(f.hasta) || hoy();
+  const familias = filas('Familias'), noEst = {};
+  familias.forEach(x => { if (x.Estadistica === 'No') noEst[x.ID] = 1; });
+  const alumnos = filas('Alumnos').filter(a => a.Activo !== 'NO' && !noEst[a.FamiliaID]);
+  const ids = {}; alumnos.forEach(a => { ids[a.ID] = a; });
+  const enRango = x => x.Fecha >= desde && x.Fecha <= hasta && ids[x.AlumnoID];
+  const sal = filas('Salidas').filter(enRango), asis = filas('Asistencia').filter(enRango);
+  // Días de clase = días con pase de lista o con salidas registradas
+  const dias = {};
+  sal.concat(asis).forEach(x => { dias[x.Fecha] = 1; });
+  const nDias = Object.keys(dias).length;
+  const cuenta = (rows, k) => { const m = {}; rows.forEach(x => { const v = x[k] || 'Normal'; m[v] = (m[v] || 0) + 1; }); return m; };
+  const faltas = asis.filter(x => x.Estado === 'Faltó');
+  const porGrupo = GRUPOS.map(g => {
+    const n = alumnos.filter(a => a.Grupo === g).length, fa = faltas.filter(x => x.Grupo === g).length, sg = sal.filter(x => x.Grupo === g);
+    return { grupo: g, alumnos: n, faltas: fa, asistencia: n && nDias ? Math.round(1000 * (1 - fa / (n * nDias))) / 10 : null,
+      salidas: sg.length, tempranas: sg.filter(x => x.Tipo === 'Temprana').length, noAutorizados: sg.filter(x => x.Tipo === 'No autorizado').length,
+      transporte: sg.filter(x => x.Tipo === 'Transporte').length };
+  }).filter(x => x.alumnos);
+  const motivos = cuenta(sal.filter(x => x.Tipo === 'Temprana' && x.Motivo), 'Motivo');
+  Object.keys(motivos).forEach(k => { if (/^Otro/.test(k) && k !== 'Otro') { motivos.Otro = (motivos.Otro || 0) + motivos[k]; delete motivos[k]; } });
+  const horas = {};
+  sal.filter(x => x.Tipo !== 'Transporte' && x.Tipo !== 'Temprana').forEach(x => { const h = x.Hora.slice(0, 4) + '0'; /* bloques de 10 minutos */ horas[h] = (horas[h] || 0) + 1; });
+  const conAcuerdo = familias.filter(x => x.Acuerdo).length;
+  return { desde, hasta, dias: nDias, alumnos: alumnos.length, excluidos: filas('Alumnos').filter(a => a.Activo !== 'NO' && noEst[a.FamiliaID]).length,
+    salidas: sal.length, porTipo: cuenta(sal, 'Tipo'), faltas: faltas.length,
+    asistencia: alumnos.length && nDias ? Math.round(1000 * (1 - faltas.length / (alumnos.length * nDias))) / 10 : null,
+    porGrupo, motivos, horas, acuerdos: { firmados: conAcuerdo, total: familias.length } };
+}
+
 function listaGrupo(token, grupo) {
   sesion(token, ['dir']);
   const familias = filas('Familias');
   return filas('Alumnos').filter(a => a.Grupo === grupo && a.Activo !== 'NO')
     .sort((a, b) => a.Nombre.localeCompare(b.Nombre))
-    .map(a => { const f = familias.find(x => x.ID === a.FamiliaID) || {}; return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, tutor: f.Tutor || '', pin: f.PIN || '', transporte: a.Transporte }; });
+    .map(a => { const f = familias.find(x => x.ID === a.FamiliaID) || {}; return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, tutor: f.Tutor || '', pin: f.PIN || '', transporte: a.Transporte, acuerdo: !!f.Acuerdo }; });
 }
 
 function buscarAlumnos(token, texto) {
@@ -948,7 +1048,7 @@ function fichaAlumno(token, id) {
     rutas: rutasEscuela(alumnos),
     permisos: permisosActivos().filter(p => p.AlumnoID ? p.AlumnoID === a.ID : p.Grupo === a.Grupo).map(p => describirPermiso(p, maestros, alumnos)),
     maestros: maestros.filter(m => m.Grupo !== a.Grupo).sort((x, y) => GRUPOS.indexOf(x.Grupo) - GRUPOS.indexOf(y.Grupo)).map(m => ({ id: m.ID, nombre: m.Nombre, grupo: m.Grupo })),
-    familia: { id: f.ID, tutor: f.Tutor, pin: f.PIN, correo: f.Correo, telefono: f.Telefono },
+    familia: { id: f.ID, tutor: f.Tutor, pin: f.PIN, correo: f.Correo, telefono: f.Telefono, acuerdo: f.Acuerdo || '', estadistica: f.Estadistica || '' },
     hermanos: alumnos.filter(x => x.FamiliaID === a.FamiliaID && x.ID !== a.ID && x.Activo !== 'NO').map(x => ({ id: x.ID, nombre: x.Nombre, grupo: x.Grupo })),
     personas: personasDe(a.FamiliaID),
     salidas: filas('Salidas').filter(x => x.AlumnoID === a.ID).slice(-15).reverse().map(salidaCorta)
@@ -1027,7 +1127,13 @@ function editarFamilia(token, d) {
     if (!f) throw new Error('Familia no encontrada.');
     const pin = txt(d.pin);
     if (pin && !/^\d{4,6}$/.test(pin)) throw new Error('El PIN debe tener de 4 a 6 números.');
-    actualizar('Familias', f._fila, { Tutor: txt(d.tutor) || f.Tutor, Correo: validarCorreo(txt(d.correo)), Telefono: txt(d.telefono), PIN: pin || f.PIN });
+    // Solo cambia lo que viene (así se puede marcar el acuerdo sin tocar el contacto)
+    const cambio = { Tutor: txt(d.tutor) || f.Tutor, PIN: pin || f.PIN };
+    if (d.correo !== undefined) cambio.Correo = validarCorreo(txt(d.correo));
+    if (d.telefono !== undefined) cambio.Telefono = txt(d.telefono);
+    if (d.acuerdo !== undefined) cambio.Acuerdo = d.acuerdo ? (f.Acuerdo || hoy()) : '';
+    if (d.estadistica !== undefined) cambio.Estadistica = d.estadistica === 'No' ? 'No' : (d.estadistica === 'Sí' ? 'Sí' : '');
+    actualizar('Familias', f._fila, cambio);
     return true;
   });
 }
