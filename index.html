@@ -85,6 +85,14 @@ div.item{cursor:default}
 .seg button{font:inherit;font-size:.9rem;font-weight:500;min-height:44px;border:0;border-radius:9px;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px}
 .seg button svg{width:20px;height:20px}
 .seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg.tres{grid-template-columns:repeat(3,1fr)}
+.seg.tres button{min-height:40px;font-size:.84rem}
+.seg button.falta[aria-pressed="true"]{background:var(--bad);color:#fff}
+.seg button.trans[aria-pressed="true"]{background:var(--accent);color:var(--card)}
+.asis{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}
+.asis b{font-weight:500;display:block}.asis .s{font-size:.84rem;color:var(--muted);display:block}
+.fotoprev{width:100%;max-width:180px;border-radius:14px;align-self:center;border:2px solid var(--line)}
+.otra{border:2px solid var(--mark)}
 .grupos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 @media (min-width:560px){.grupos{grid-template-columns:repeat(6,1fr)}}
 .grupos button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:12px;padding:10px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -188,6 +196,7 @@ const ESCUELA = 'Escuela Primaria Profesor Gerardo Guadalupe Leal Leal';
 const GRUPOS=['1°A','1°B','2°A','2°B','3°A','3°B','4°A','4°B','5°A','5°B','6°A','6°B'];
 const PARENTESCOS=['Mamá','Papá','Abuela','Abuelo','Tía','Tío','Hermano(a) mayor de edad','Padrastro','Madrastra','Otro'];
 const MOTIVOS=['Cita médica','Se sintió mal','Asunto familiar','Otro'];
+const PARENTESCOS_OTRA=['Vecino(a)','Amigo(a) de la familia','Abuela','Abuelo','Tía','Tío','Primo(a) mayor de edad','Chofer o transporte particular','Otro'];
 
 /* ---------- Íconos ---------- */
 const svg=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -225,14 +234,18 @@ const GUIAS={
   maestro:{
     bienvenida:[[I.scan,'Escanea el código','Toca «Escanear código QR» y apunta la cámara al código que te muestran. El alumno aparece solo.'],
       [I.person,'Revisa quién lo recoge','Toca la foto de la persona que vino por el alumno y luego «Registrar salida». Si no está en las fotos, no lo entregues.'],
-      [I.list,'¿No traen código?','Toca al alumno en tu lista para darle salida, pidiendo identificación.'],
+      [I.list,'Pasa lista antes de la salida','En «Lista» marca quién faltó y quién se va en transporte hoy. Los que faltaron no aparecen para entregar.'],
+      [I.person,'¿Viene alguien que no está en las fotos?','Toca «Lo recoge otra persona», confirma con la familia, anota sus datos y tómale foto.'],
       [I.key,'Hermanos y permisos','En «Permisos» dejas que otro maestro entregue a tus alumnos, solo hoy o siempre.']],
-    pasos:[['Toca «Escanear código QR»','La primera vez el teléfono pide permiso para usar la cámara: toca «Permitir».'],
+    pasos:[['Pasa lista en «Lista»','Todos empiezan presentes. Toca «Faltó» o cambia el transporte de hoy. La familia del que faltó recibe un aviso.'],
+      ['Toca «Escanear código QR»','La primera vez el teléfono pide permiso para usar la cámara: toca «Permitir».'],
       ['Apunta al código','Aparece el alumno con las fotos de quien lo puede recoger.'],['Toca la foto de quien recoge','Si no está en las fotos, no lo entregues y avisa a la dirección.'],
       ['Revisa hermanos y motivo','Si sus hermanos salen juntos aparecen marcados. Antes de la hora de salida elige el motivo.'],
       ['Toca «Registrar salida»','La familia recibe un correo. Toca «Escanear siguiente» para el próximo alumno.'],
       ['Transporte','En tu lista toca «Entregar al transporte» cuando suban.']],
-    faq:[['Registré una salida por error','Abre al alumno en tu lista y toca «Deshacer esta salida». La familia recibe un aviso de corrección.'],
+    faq:[['Viene por el alumno alguien que no está en las fotos','Toca «Lo recoge otra persona». Llama a la familia (su teléfono aparece ahí) o pide autorización a la dirección. Si no se confirma, no lo entregues. Si sí: anota nombre, parentesco, teléfono e identificación y tómale foto.'],
+      ['Marqué falta a un alumno que sí vino','En «Lista» tócalo como «Presente». Su familia recibe un aviso de corrección.'],
+      ['Registré una salida por error','Abre al alumno en tu lista y toca «Deshacer esta salida». La familia recibe un aviso de corrección.'],
       ['Dice «Sin permiso»','El alumno es de otro grupo. Su maestro te puede dar permiso en «Permisos», o pídelo a la dirección.'],
       ['La cámara no abre','Revisa que el navegador tenga permiso de cámara, o escribe el código que aparece debajo del QR.'],
       ['¿Qué alumnos veo?','Tu grupo y los hermanos que otros maestros te autorizaron. La dirección ve a toda la escuela.']],
@@ -263,7 +276,7 @@ const hoyISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMont
 const fechaBonita=f=>{if(!f)return'';if(f===hoyISO())return'Hoy';const[y,m,d]=f.split('-');return`${+d}/${+m}/${y}`};
 function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,4000)}
 const qrUrl=c=>location.origin+location.pathname+'?qr='+encodeURIComponent(c);
-const pillTipo=t=>t==='Temprana'?'<span class="pill warn">Temprana</span>':t==='Transporte'?`<span class="pill">${I.bus}Transporte</span>`:'';
+const pillTipo=t=>t==='Temprana'?'<span class="pill warn">Temprana</span>':t==='Transporte'?`<span class="pill">${I.bus}Transporte</span>`:t==='No autorizado'?'<span class="pill bad">No autorizado</span>':'';
 const textoSalida=s=>s.tipo==='Transporte'?`Subió al ${esc(s.recogio).replace('Transporte','transporte')}`:`Con ${esc(s.recogio)}${s.parentesco?' ('+esc(s.parentesco)+')':''}`;
 
 async function api(fn,...args){
@@ -303,7 +316,7 @@ const sub=()=>pila[pila.length-1]||null;
 
 const TABS={
   padre:[['hijos','Mis hijos',I.qr],['personas','Autorizados',I.people],['historial','Historial',I.clock],['cuenta','Cuenta',I.user]],
-  maestro:[['salidas','Salidas',I.scan],['permisos','Permisos',I.key],['hoy','Hoy',I.clock]],
+  maestro:[['salidas','Salidas',I.scan],['asistencia','Lista',I.list],['permisos','Permisos',I.key],['hoy','Hoy',I.clock]],
   dir:[['inicio','Inicio',I.home],['alumnos','Alumnos',I.list],['escanear','Escanear',I.scan],['maestros','Maestros',I.people],['mas','Más',I.more]]
 };
 
@@ -351,6 +364,7 @@ async function cargarSub(){
 
 /* ---------- Render ---------- */
 function render(){
+  guardarOtra();
   const bar=$('bar');
   if(!ses){bar.hidden=true;document.body.classList.add('sinbarra');app.innerHTML=vLogin();return}
   if(!tab)tab=TABS[ses.rol][0][0];
@@ -368,7 +382,7 @@ function render(){
   app.querySelectorAll('.qr[data-code]').forEach(el=>{try{new QRCode(el,{text:qrUrl(el.dataset.code),width:200,height:200,colorDark:'#17232b',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M})}catch(e){el.textContent=el.dataset.code}});
 }
 const cargando='<div class="cargando">Cargando…</div>';
-const listaSalidas=(rows,vacio)=>rows.length?`<div class="list">${rows.map(e=>`<div class="salida"><span><span class="h">${esc(fechaBonita(e.fecha))} · ${esc(e.hora)}</span> · ${esc(e.alumno)} <span class="pill gris">${esc(e.grupo)}</span> ${pillTipo(e.tipo)}</span><span class="muted">${textoSalida(e)} · Entregó ${esc(e.entrego)}${e.motivo?' · Motivo: '+esc(e.motivo):''}</span></div>`).join('')}</div>`:`<p class="muted">${vacio}</p>`;
+const listaSalidas=(rows,vacio)=>rows.length?`<div class="list">${rows.map(e=>`<div class="salida"><span><span class="h">${esc(fechaBonita(e.fecha))} · ${esc(e.hora)}</span> · ${esc(e.alumno)} <span class="pill gris">${esc(e.grupo)}</span> ${pillTipo(e.tipo)}</span><span class="muted">${textoSalida(e)} · Entregó ${esc(e.entrego)}${e.motivo?' · Motivo: '+esc(e.motivo):''}${e.confirmo?' · Tel. '+esc(e.telefono)+' · '+esc(e.identificacion)+' · Confirmó: '+esc(e.confirmo):''}</span></div>`).join('')}</div>`:`<p class="muted">${vacio}</p>`;
 const botonConfirmar=(k,etiqueta,accion,attrs,texto,clase='btn full')=>confirmar===k
   ?`<div class="confirm">${texto}<div class="row"><button class="btn warn grow" data-a="${accion}" ${attrs}>Confirmar</button><button class="btn grow" data-a="cancelar">Cancelar</button></div></div>`
   :`<button class="${clase}" data-a="pedir" data-k="${esc(k)}">${etiqueta}</button>`;
@@ -393,7 +407,8 @@ function vLogin(){
 /* ===== Filas de alumnos (maestro) ===== */
 function filaAlumno(a,conGrupo){
   let estado;
-  if(a.salida)estado=`<span class="pill ${a.salida.tipo==='Temprana'?'warn':'ok'}">${a.salida.tipo==='Transporte'?I.bus:''}${esc(a.salida.hora)}</span>`;
+  if(a.salida)estado=`<span class="pill ${a.salida.tipo==='Temprana'?'warn':a.salida.tipo==='No autorizado'?'bad':'ok'}">${a.salida.tipo==='Transporte'?I.bus:''}${esc(a.salida.hora)}</span>`;
+  else if(a.asistencia==='Faltó')estado='<span class="pill bad">Faltó</span>';
   else if(a.transporte)estado=`<span class="pill">${I.bus}${esc(a.transporte)}</span>`;
   else estado='<span class="pill gris">En escuela</span>';
   const s=a.salida?textoSalida(a.salida):(conGrupo?`${esc(a.grupo)}`:'');
@@ -409,7 +424,7 @@ padre_hijos(){
   if(!d.personas.length)h+=`<div class="aviso">${I.people}<div class="grow"><b>Falta decir quién puede recogerlo</b><p class="muted">Sin personas autorizadas el maestro no podrá entregarlo.</p></div><button class="btn sm pri" data-tab="personas">Agregar</button></div>`;
   if(!d.correo)h+=`<div class="aviso">${I.clock}<div class="grow"><b>Recibe un aviso en cada salida</b><p class="muted">Escribe tu correo en Cuenta.</p></div><button class="btn sm" data-tab="cuenta">Agregar</button></div>`;
   return h+d.hijos.map(s=>`<section class="card"><div class="row"><div class="grow"><h2>${esc(s.nombre)}</h2><span class="muted">${esc(s.grupo)} · ${esc(s.maestro)}</span></div>${s.transporte?`<span class="pill">${I.bus}${esc(s.transporte)}</span>`:''}</div>
-    ${s.hoy?`<p class="pill ok" style="align-self:flex-start;white-space:normal">Hoy salió ${esc(s.hoy.hora)} · ${textoSalida(s.hoy)}</p>`:''}
+    ${s.hoy?`<p class="pill ${s.hoy.tipo==='No autorizado'?'bad':'ok'}" style="align-self:flex-start;white-space:normal">Hoy salió ${esc(s.hoy.hora)} · ${textoSalida(s.hoy)}</p>`:s.asistencia==='Faltó'?'<p class="pill bad" style="align-self:flex-start;white-space:normal">Hoy está registrado(a) como ausente. Si sí vino, avisa a la escuela.</p>':''}
     <div class="qrwrap"><div class="qr" data-code="${esc(s.qr)}"></div><span class="code muted">${esc(s.qr)}</span>
     <p class="muted">Toma captura, imprímelo o pégalo en la credencial. Cualquier persona autorizada puede mostrarlo.</p></div>
     ${botonConfirmar('qr'+s.id,'Cambiar código QR','nuevoqr',`data-id="${s.id}"`,'El código actual dejará de funcionar y tendrás que usar el nuevo.')}</section>`).join('');
@@ -432,11 +447,13 @@ padre_cuenta(){
 /* ===== MAESTRO ===== */
 maestro_salidas(){
   const d=D.maestro;if(!d)return `<button class="btn pri xl full" data-a="camara">${I.scan} Escanear código QR</button>`+cargando;
-  const g=d.grupo,fuera=g.filter(a=>a.salida),dentro=g.filter(a=>!a.salida),trans=g.filter(a=>a.transporte),transPend=trans.filter(a=>!a.salida);
+  const g=d.grupo,fuera=g.filter(a=>a.salida),faltas=g.filter(a=>!a.salida&&a.asistencia==='Faltó'),dentro=g.filter(a=>!a.salida&&a.asistencia!=='Faltó'),trans=g.filter(a=>a.transporte),transPend=trans.filter(a=>!a.salida);
   const lista=filtro==='dentro'?dentro:filtro==='fuera'?fuera:g;
   let h=`<button class="btn pri xl full" data-a="camara">${I.scan} Escanear código QR</button>
   <p class="muted" style="text-align:center"><span class="paso">1</span>Escanea <span class="paso">2</span>Toca la foto <span class="paso">3</span>Registrar salida</p>
   <div class="stats" ${trans.length?'':'style="grid-template-columns:repeat(2,1fr)"'}><div class="stat"><b>${dentro.length}</b><span>En la escuela</span></div><div class="stat"><b>${fuera.length}</b><span>Ya salieron</span></div>${trans.length?`<div class="stat"><b>${trans.length-transPend.length}/${trans.length}</b><span>Transporte</span></div>`:''}</div>`;
+  if(!d.listaPasada&&d.temprana)h+=`<div class="aviso">${I.list}<div class="grow"><b>Pasa lista antes de la salida</b><p class="muted">Marca quién faltó y quién se va en transporte hoy.</p></div><button class="btn sm pri" data-tab="asistencia">Lista</button></div>`;
+  if(faltas.length)h+=`<p class="muted">Faltaron hoy: <b>${esc(faltas.map(a=>nom1(a.nombre)).join(', '))}</b> · no aparecen para entregar.</p>`;
   if(d.temprana)h+=`<p class="nota">Antes de las <b>${esc(d.horaSalida)}</b> la salida cuenta como <b>temprana</b> y se pide el motivo.</p>`;
   if(transPend.length){
     const rutas={};transPend.forEach(a=>(rutas[a.transporte]=rutas[a.transporte]||[]).push(nom1(a.nombre)));
@@ -449,6 +466,24 @@ maestro_salidas(){
   <div class="list">${lista.map(a=>filaAlumno(a)).join('')||'<p class="muted">No hay alumnos aquí.</p>'}</div></section>`;
   if(d.extras.length)h+=`<section class="card"><h3>Hermanos que también entregas</h3><div class="list">${d.extras.map(a=>filaAlumno(a,true)).join('')}</div></section>`;
   return h;
+},
+maestro_asistencia(){
+  const d=D.maestro;if(!d)return cargando;
+  const g=d.grupo,faltas=g.filter(a=>a.asistencia==='Faltó'),trans=g.filter(a=>a.transporte);
+  const fecha=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+  const fila=a=>{
+    if(a.salida)return `<div class="asis"><div class="row"><span class="grow"><b>${esc(a.nombre)}</b><span class="s">${textoSalida(a.salida)}</span></span><span class="pill ok">Salió ${esc(a.salida.hora)}</span></div></div>`;
+    const ops=a.ruta?[['','Presente',''],['Faltó','Faltó','falta'],['Recogen','Lo recogen','trans']]:[['','Presente',''],['Faltó','Faltó','falta'],['Transporte','Transporte','trans']];
+    const sub=a.asistencia==='Faltó'?'Faltó · su familia recibe un aviso':a.transporte?`Se va en ${esc(a.transporte)}`:a.ruta?`Hoy lo recogen (normalmente ${esc(a.ruta)})`:'Lo recogen';
+    let h=`<div class="asis"><span><b>${esc(a.nombre)}</b><span class="s">${sub}</span></span>
+    <div class="seg tres" role="group" aria-label="Asistencia de ${esc(nom1(a.nombre))}">${ops.map(([k,l,c])=>`<button class="${c}" aria-pressed="${(a.asistencia||'')===k}" data-a="asis" data-id="${a.id}" data-val="${k}">${l}</button>`).join('')}</div>`;
+    if(confirmar==='ruta'+a.id)h+=`<div class="row"><select id="ruta${a.id}" class="grow" aria-label="Ruta">${(d.rutas.length?d.rutas:['Transporte']).map(r=>`<option>${esc(r)}</option>`).join('')}</select><button class="btn pri sm" data-a="asisruta" data-id="${a.id}">Guardar</button><button class="btn sm" data-a="cancelar">Cancelar</button></div>`;
+    return h+'</div>';
+  };
+  return `<p class="muted" style="text-transform:capitalize;margin:0">${esc(fecha)} · ${esc(d.yo.grupo)}</p>
+  <div class="stats"><div class="stat"><b>${g.length-faltas.length}</b><span>Presentes</span></div><div class="stat"><b>${faltas.length}</b><span>Faltaron</span></div><div class="stat"><b>${trans.length}</b><span>Transporte hoy</span></div></div>
+  <p class="nota">Todos empiezan como <b>presentes</b>. Marca solo a quien <b>faltó</b> y los cambios de transporte de hoy. Quien faltó no aparece para entregar y su familia recibe un correo.</p>
+  <section class="card"><div>${g.map(fila).join('')||'<p class="muted">No hay alumnos en tu grupo.</p>'}</div></section>`;
 },
 maestro_permisos(){
   const d=D.maestro;if(!d)return cargando;
@@ -479,8 +514,9 @@ dir_inicio(){
   return `<div class="stats"><div class="stat"><b>${d.total}</b><span>Alumnos</span></div><div class="stat"><b>${d.salidasHoy}</b><span>Salidas hoy</span></div><div class="stat"><b>${d.transporte.entregados}/${d.transporte.total}</b><span>Transporte</span></div></div>
   ${d.sinPersonas?`<section class="card" style="border-color:var(--mark)"><p><b>${d.sinPersonas} alumnos</b> no tienen personas autorizadas. Agrégalas desde la ficha de cada alumno.</p></section>`:''}
   <div class="acciones"><button class="btn pri" data-a="alta">+ Alumno</button><button class="btn" data-a="importar">Importar Excel</button><button class="btn" data-a="transporteDir">${I.bus} Transporte</button><button class="btn" data-a="permisosDir">${I.key} Permisos</button></div>
-  <p class="muted">Hora de salida: <b>${esc(d.horaSalida)}</b> · Tempranas hoy: <b>${d.tempranas}</b> · Permisos permanentes: <b>${d.permanentes}</b></p>
-  <section class="card"><h3>Salidas de hoy por grupo</h3><div class="grupos">${d.grupos.map(g=>`<button data-a="vergrupo" data-g="${g}"><b>${g}</b><span>${d.conteo[g].salidas}/${d.conteo[g].alumnos}</span></button>`).join('')}</div></section>
+  ${d.noAutorizados?`<section class="card" style="border-color:var(--bad)"><p><b>${d.noAutorizados} ${d.noAutorizados===1?'salida':'salidas'} con persona no autorizada hoy.</b> Revísalas en Últimas salidas o en Reportes.</p></section>`:''}
+  <p class="muted">Hora de salida: <b>${esc(d.horaSalida)}</b> · Faltaron hoy: <b>${d.faltas}</b> · Tempranas: <b>${d.tempranas}</b> · Permisos permanentes: <b>${d.permanentes}</b></p>
+  <section class="card"><h3>Salidas de hoy por grupo</h3><div class="grupos">${d.grupos.map(g=>`<button data-a="vergrupo" data-g="${g}"><b>${g}</b><span>${d.conteo[g].salidas}/${d.conteo[g].alumnos-d.conteo[g].faltas}${d.conteo[g].faltas?' · '+d.conteo[g].faltas+(d.conteo[g].faltas===1?' falta':' faltas'):''}</span></button>`).join('')}</div></section>
   <section class="card"><h3>Últimas salidas</h3>${listaSalidas(d.ultimas,'Todavía no hay salidas hoy.')}</section>
   <p class="muted">Correos de aviso disponibles hoy: ${d.correosRestantes}</p>`;
 },
@@ -541,21 +577,37 @@ function formPersona(famId){
 
 /* ===== Entrega (escaneo o desde la lista) ===== */
 function abrirEntrega(o){
-  E={o,res:null,persona:'',transporte:false,hermanos:{},motivo:'',hecho:null,via:o.qr?'QR':'Lista'};
+  E={o,res:null,persona:'',transporte:false,hermanos:{},motivo:'',hecho:null,via:o.qr?'QR':'Lista',otra:false,od:null};
   if(sub()&&sub().t==='entrega'){render();cargarSub()}else abrir({t:'entrega'});
 }
 function iniciarEntrega(r){
   E.res=r;if(!r.valido)return;
   E.transporte=!!r.alumno.transporte&&!r.salida;
-  E.persona=r.personas.length===1?r.personas[0].id:'';
+  E.persona=r.personas.length===1?r.personas[0].id:'';E.otra=false;E.od=null;
   E.hermanos={};
   r.hermanos.forEach(h=>{if(h.permiso!=='no'&&!h.salida)E.hermanos[h.id]=['siempre','propio','dir'].indexOf(h.permiso)>=0});
 }
 const etiquetaPermiso={propio:'Tu grupo',hoy:'Permiso de hoy',siempre:'Permiso permanente',dir:'Dirección',no:'Sin permiso'};
-function hermanosElegibles(){return E.res.hermanos.filter(h=>h.permiso!=='no'&&!h.salida&&(!E.transporte||h.transporte))}
+function hermanosElegibles(){return E.res.hermanos.filter(h=>h.permiso!=='no'&&!h.salida&&h.asistencia!=='Faltó'&&(!E.transporte||h.transporte))}
+// Persona NO autorizada: datos, identificación, confirmación y foto obligatoria
+function formOtra(r){
+  const o=E.od||{},f=r.familia||{};
+  const sel=(id,ops,v,ph)=>`<select id="${id}"><option value="">${ph}</option>${ops.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+  return `<section class="card form otra"><div class="row"><h2 class="grow">Persona no autorizada</h2><button class="btn sm" type="button" data-a="otra">Cancelar</button></div>
+  <div class="nota"><b>Antes de entregar:</b> confirma con la familia${f.tutor?' ('+esc(f.tutor)+')':''}${f.telefono?` al <a href="tel:${esc(f.telefono)}"><b>${esc(f.telefono)}</b></a>`:''} o con la dirección. Si no se puede confirmar, <b>no lo entregues</b>.</div>
+  <label class="f" for="onn">Nombre completo de quien recoge<input id="onn" value="${esc(o.nombre||'')}" autocomplete="off"></label>
+  <label class="f" for="onp">Parentesco o relación${sel('onp',PARENTESCOS_OTRA,o.parentesco,'Elige…')}</label>
+  <label class="f" for="ont">Teléfono de quien recoge<input id="ont" type="tel" inputmode="tel" value="${esc(o.telefono||'')}" placeholder="10 dígitos" autocomplete="off"></label>
+  <label class="f" for="oni">Identificación que presentó${sel('oni',r.identificaciones||[],o.identificacion,'Elige…')}</label>
+  <label class="f" for="onc">¿Cómo se confirmó?${sel('onc',r.confirmaciones||[],o.confirmo,'Elige…')}</label>
+  ${o.foto?`<img class="fotoprev" src="${o.foto}" alt="Foto de quien recoge">`:''}
+  <label class="btn ${o.foto?'':'pri'} full" for="onf">${o.foto?'Tomar otra foto':'Tomar foto de la persona (obligatoria)'}<input id="onf" type="file" accept="image/*" capture="environment" hidden></label>
+  <p class="muted">La foto y los datos quedan en el registro de la salida. La familia recibe un correo con los datos.</p></section>`;
+}
+function guardarOtra(){if(!E||!E.otra||!$('onn'))return;E.od=Object.assign(E.od||{},{nombre:val('onn'),parentesco:val('onp'),telefono:val('ont'),identificacion:val('oni'),confirmo:val('onc')})}
 function botonRegistrar(){
   const n=1+hermanosElegibles().filter(h=>E.hermanos[h.id]).length;
-  return E.transporte?`${I.bus} Entregar al transporte${n>1?' ('+n+' alumnos)':''}`:`Registrar salida${n>1?' de '+n+' alumnos':''}`;
+  return E.transporte?`${I.bus} Entregar al transporte${n>1?' ('+n+' alumnos)':''}`:`Registrar salida${n>1?' de '+n+' alumnos':''}${E.otra?' con persona no autorizada':''}`;
 }
 const SUB={
 ayuda(){
@@ -580,15 +632,20 @@ entrega(){
     return h;
   }
   if(!ok)return h+`<section class="card"><p>${esc(nom1(a.nombre))} es de ${esc(a.grupo)}. Para entregarlo, ${esc(a.titular)} debe darte permiso en su sección <b>Permisos</b> (solo hoy o siempre).</p></section>`;
+  if(a.asistencia==='Faltó')return h+`<section class="card result no"><h2>Marcado(a) como falta hoy</h2><p class="muted">Si el alumno sí está en la escuela, quita la falta para poder darle salida. La familia recibe un aviso de corrección.</p>
+    <button class="btn pri big full" data-a="quitarfalta" data-id="${a.id}">Sí está: quitar la falta</button></section>`;
   if(E.via==='Lista'&&!E.transporte)h+=`<p class="nota">Sin código QR: verifica la identificación de quien recoge.</p>`;
   if(a.transporte)h+=`<div class="seg" role="group" aria-label="Cómo se va">${[['persona','Lo recogen',I.person],['transporte','Transporte · '+a.transporte,I.bus]].map(([k,l,ic])=>`<button aria-pressed="${(k==='transporte')===E.transporte}" data-a="modo" data-val="${k}">${ic}${esc(l)}</button>`).join('')}</div>`;
-  if(!E.transporte){
+  if(!E.transporte&&!E.otra){
     h+=r.personas.length?`<section class="card"><h2><span class="paso">1</span>Toca la foto de quien lo recoge</h2><div class="pick">${r.personas.map((p,i)=>`<label for="pk${i}"><input type="radio" name="pk" id="pk${i}" value="${p.id}" ${E.persona===p.id?'checked':''}>${av(p.nombre,p.foto,'xl')}<span class="grow"><b>${esc(p.nombre)}</b><br><span class="muted">${esc(p.parentesco)}</span></span></label>`).join('')}</div></section>`
-      :`<section class="card result no"><p>Esta familia no tiene personas autorizadas registradas. Comunícate con la dirección.</p></section>`;
+      :`<section class="card result no"><p>Esta familia no tiene personas autorizadas registradas.</p></section>`;
+    h+=`<button class="btn full" data-a="otra">${I.person} Lo recoge otra persona (no está en las fotos)</button>`;
   }
+  if(!E.transporte&&E.otra)h+=formOtra(r);
   if(r.hermanos.length){
     h+=`<section class="card"><h3>Hermanos · márcalos si salen juntos</h3><div class="pick">${r.hermanos.map(x=>{
       if(x.salida)return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">Ya salió ${esc(x.salida.hora)}</span></span></div>`;
+      if(x.asistencia==='Faltó')return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">Faltó hoy</span></span></div>`;
       if(x.permiso==='no')return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">Para entregarlo necesitas permiso de ${esc(x.titular)}</span></span></div>`;
       if(E.transporte&&!x.transporte)return `<div class="chk off"><span class="grow"><b>${esc(x.nombre)}</b> · ${esc(x.grupo)}<br><span class="muted">No usa transporte</span></span></div>`;
       return `<label class="chk" for="hm${x.id}"><input type="checkbox" id="hm${x.id}" data-h="${x.id}" ${E.hermanos[x.id]?'checked':''}><span class="grow"><b>También sale ${esc(x.nombre)}</b><br><span class="muted">${esc(x.grupo)} · ${etiquetaPermiso[x.permiso]}</span></span></label>`;
@@ -599,7 +656,7 @@ entrega(){
     <div class="chips envolver">${MOTIVOS.map(m=>`<button aria-pressed="${E.motivo===m}" data-a="motivo" data-val="${esc(m)}">${esc(m)}</button>`).join('')}</div>
     ${E.motivo==='Otro'?`<label class="f" for="motivoOtro">¿Cuál?<input id="motivoOtro" autocomplete="off"></label>`:''}</section>`;
   }
-  return h+`<button class="btn pri big full" data-a="registrar" data-id="${a.id}" id="btnreg" ${!E.transporte&&!r.personas.length?'disabled':''}>${botonRegistrar()}</button>`;
+  return h+`<button class="btn ${E.otra?'warn':'pri'} big full" data-a="registrar" data-id="${a.id}" id="btnreg" ${!E.transporte&&!E.otra&&!r.personas.length?'disabled':''}>${botonRegistrar()}</button>`;
 },
 ficha(s){
   const d=D.ficha;if(!d||d.alumno.id!==s.id)return cargando;
@@ -719,7 +776,7 @@ reportes(){
   const f=D.filtro||{};
   return `<h1>Reportes</h1><form class="card form" id="f-reporte">
   <label class="f" for="rg">Grupo<select id="rg"><option value="">Todos</option>${GRUPOS.map(g=>`<option ${f.grupo===g?'selected':''}>${g}</option>`).join('')}</select></label>
-  <label class="f" for="rt">Tipo de salida<select id="rt"><option value="">Todas</option>${['Normal','Temprana','Transporte'].map(t=>`<option ${f.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
+  <label class="f" for="rt">Tipo de salida<select id="rt"><option value="">Todas</option>${['Normal','Temprana','Transporte','No autorizado'].map(t=>`<option ${f.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
   <label class="f" for="rn">Alumno<input id="rn" type="search" value="${esc(f.alumno||'')}" placeholder="Nombre (opcional)"></label>
   <div class="row"><label class="f grow" for="rd">Desde<input id="rd" type="date" value="${esc(f.desde||'')}"></label><label class="f grow" for="rh">Hasta<input id="rh" type="date" value="${esc(f.hasta||'')}"></label></div>
   <div class="row"><button class="btn pri grow" type="submit">Ver</button><button class="btn grow" type="button" data-a="excel">Descargar Excel</button></div></form>
@@ -747,6 +804,7 @@ function vHecho(){
   return `<section class="card hecho"><div class="check">${I.check}</div><h1>${x.tipo==='Transporte'?'Entregado al transporte':'Salida registrada'}</h1>
   <div class="horag">${esc(x.hora)}</div>
   <p>${esc(lista)} · ${x.tipo==='Transporte'?esc(x.recogio):'con '+esc(x.recogio)} ${pillTipo(x.tipo)}</p>
+  ${x.tipo==='No autorizado'?'<p class="muted">Se guardaron la foto y los datos de quien recogió. La dirección lo verá en el reporte del día.</p>':''}
   <p class="muted">Correo a la familia: ${esc(x.correo)}</p></section>
   <button class="btn pri xl full" data-a="siguiente">${I.scan} Escanear siguiente</button>
   <button class="btn big full" data-a="atras">${ses.rol==='maestro'?'Volver a mi grupo':'Listo'}</button>
@@ -874,6 +932,7 @@ document.addEventListener('click',async e=>{
     case 'filtro':filtro=b.dataset.val;return render();
     case 'hoyfiltro':hoyFiltro=b.dataset.val;return render();
     case 'dur':permDur=b.dataset.val;return render();
+    case 'otra':guardarOtra();E.otra=!E.otra;if(E.otra)E.persona='';render();if(E.otra&&$('onn'))$('onn').focus();return;
     case 'modo':E.transporte=b.dataset.val==='transporte';E.hermanos={};E.res.hermanos.forEach(h=>{if(h.permiso!=='no'&&!h.salida)E.hermanos[h.id]=E.transporte?!!h.transporte:['siempre','propio','dir'].indexOf(h.permiso)>=0});return render();
     case 'motivo':E.motivo=b.dataset.val;render();if(E.motivo==='Otro'&&$('motivoOtro'))$('motivoOtro').focus();return;
     case 'entrega':return abrirEntrega({id});
@@ -895,6 +954,17 @@ document.addEventListener('click',async e=>{
   await hacer(b,async()=>{
     switch(a){
       case 'nuevoqr':await api('cambiarQR',tok(),id);confirmar=null;toast('Código QR cambiado. El anterior ya no funciona.');await recargarTodo();break;
+      case 'asis':{
+        const v=b.dataset.val,al=D.maestro.grupo.find(x=>x.id===id);if(!al||(al.asistencia||'')===v)return;
+        if(v==='Transporte'){confirmar='ruta'+id;render();return}
+        const antes={asistencia:al.asistencia,transporte:al.transporte};
+        al.asistencia=v;al.transporte=v==='Faltó'||v==='Recogen'?'':al.ruta;confirmar=null;render();
+        try{await api('marcarAsistencia',tok(),[id],v);D.maestro.listaPasada=true;toast(v==='Faltó'?nom1(al.nombre)+': falta registrada. Se avisó a su familia.':v==='Recogen'?nom1(al.nombre)+': hoy lo recogen.':nom1(al.nombre)+': presente.')}
+        catch(err){Object.assign(al,antes);render();throw err}
+        break}
+      case 'asisruta':{const ruta=val('ruta'+id),al=D.maestro.grupo.find(x=>x.id===id);await api('marcarAsistencia',tok(),[id],'Transporte',ruta);
+        al.asistencia='Transporte';al.transporte=al.ruta||ruta;confirmar=null;D.maestro.listaPasada=true;toast(nom1(al.nombre)+' se va hoy en '+al.transporte+'.');render();break}
+      case 'quitarfalta':await api('marcarAsistencia',tok(),[id],'');toast('Falta quitada. Ya puedes darle salida.');E.res=null;render();await cargarSub();if(D.maestro)cargar();break;
       case 'quitarp':await api('quitarPersona',tok(),id);confirmar=null;toast('Persona quitada.');await recargarTodo();break;
       case 'quitarpermiso':await api('quitarPermiso',tok(),id);confirmar=null;toast('Permiso quitado.');await recargarTodo();break;
       case 'permitirhermano':await api('darPermiso',tok(),{maestroId:b.dataset.m,alumnoId:id,duracion:'siempre'});toast('Listo: puede entregarlo siempre. Lo puedes quitar cuando quieras.');await cargar();break;
@@ -909,8 +979,12 @@ document.addEventListener('click',async e=>{
         const r=E.res;const herm=hermanosElegibles().filter(h=>E.hermanos[h.id]).map(h=>h.id);
         let motivo='';
         if(r.temprana&&!E.transporte){if(!E.motivo){toast('Elige el motivo de la salida temprana.');return}motivo=E.motivo==='Otro'?'Otro: '+(val('motivoOtro')||'sin detalle'):E.motivo}
-        if(!E.transporte&&!E.persona){toast('Toca la foto de quien recoge al alumno.');return}
-        const res=await api('registrarSalida',tok(),id,E.persona,{hermanos:herm,transporte:E.transporte,motivo,via:E.via});
+        let otra=null;
+        if(!E.transporte&&E.otra){guardarOtra();otra=E.od||{};
+          if(!otra.nombre||!otra.parentesco||!otra.telefono||!otra.identificacion||!otra.confirmo){toast('Llena todos los datos de quien recoge.');return}
+          if(!otra.foto){toast('Toma la foto de la persona que recoge.');return}}
+        else if(!E.transporte&&!E.persona){toast('Toca la foto de quien recoge al alumno.');return}
+        const res=await api('registrarSalida',tok(),id,otra?'':E.persona,{hermanos:herm,transporte:E.transporte,motivo,via:E.via,otra});
         E.hecho=res;confirmar=null;render();window.scrollTo(0,0);break}
       case 'excel':{const r=await api('exportarExcel',tok(),filtroRep());const bin=atob(r.base64);const u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);descargar(new Blob([u8],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre);break}
       case 'subirimp':{const p=D.imp;p.res=new Array(p.filas.length);render();
@@ -939,6 +1013,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.name==='pk'&&E){E.persona=t.value;return}
+  if(t.id==='onf'&&t.files[0]&&E){await hacer(null,async()=>{guardarOtra();E.od=E.od||{};E.od.foto=await leerFoto(t.files[0]);render()});return}
   if(t.dataset.h&&E){E.hermanos[t.dataset.h]=t.checked;const b=$('btnreg');if(b)b.innerHTML=botonRegistrar();return}
   if(t.id==='fa'&&t.files[0]){await hacer(null,async()=>{toast('Subiendo foto…');await api('fotoAlumno',tok(),sub().id,await leerFoto(t.files[0]));toast('Foto actualizada.');await cargarSub()})}
   if(t.id==='xls'&&t.files[0]){await hacer(null,async()=>{D.imp=await leerExcel(t.files[0]);render()})}

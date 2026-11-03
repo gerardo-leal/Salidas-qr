@@ -8,7 +8,7 @@
  */
 
 const TZ = 'America/Monterrey';
-const VERSION = 3;
+const VERSION = 4;
 const TIPOS_MAESTRO = ['Titular', 'Jornada ampliada'];
 const HORA_SALIDA_DEFAULT = '14:30';
 const DIAS_SESION = 30;
@@ -19,23 +19,29 @@ const HOJAS = {
   Personas: ['ID', 'FamiliaID', 'Nombre', 'Parentesco', 'FotoID'],
   // Tipo: 'Titular' o 'Jornada ampliada' (máximo uno de cada tipo por grupo)
   Maestros: ['ID', 'Nombre', 'Grupo', 'Usuario', 'Contrasena', 'Correo', 'Tipo'],
-  Salidas:  ['Fecha', 'Hora', 'AlumnoID', 'Alumno', 'Grupo', 'Recogio', 'Parentesco', 'FotoID', 'Entrego', 'Tipo', 'Motivo', 'Via'],
+  // Tipo: Normal · Temprana · Transporte · No autorizado. Telefono/Identificacion/Confirmo: solo para "No autorizado".
+  Salidas:  ['Fecha', 'Hora', 'AlumnoID', 'Alumno', 'Grupo', 'Recogio', 'Parentesco', 'FotoID', 'Entrego', 'Tipo', 'Motivo', 'Via', 'Telefono', 'Identificacion', 'Confirmo'],
+  // Pase de lista del día. Estado: Faltó · Transporte (se va en transporte hoy) · Recogen (hoy no usa su transporte)
+  Asistencia: ['Fecha', 'AlumnoID', 'Alumno', 'Grupo', 'Estado', 'Nota', 'Marco', 'Hora'],
   // Duracion: 'hoy' o 'siempre'. AlumnoID vacío = todo el grupo.
   Permisos: ['Fecha', 'Grupo', 'MaestroID', 'Duracion', 'AlumnoID', 'DadoPor', 'ID'],
   Config:   ['Clave', 'Valor']
 };
 const TEXTO = {
   Alumnos: ['CURP', 'Grupo'], Familias: ['PIN', 'Telefono'], Maestros: ['Contrasena'],
-  Salidas: ['Fecha', 'Hora'], Permisos: ['Fecha'], Config: ['Valor']
+  Salidas: ['Fecha', 'Hora', 'Telefono'], Asistencia: ['Fecha', 'Hora'], Permisos: ['Fecha'], Config: ['Valor']
 };
 const GRUPOS = ['1°A','1°B','2°A','2°B','3°A','3°B','4°A','4°B','5°A','5°B','6°A','6°B'];
+const ESTADOS = ['Faltó', 'Transporte', 'Recogen'];
+const IDENTIFICACIONES = ['INE', 'Licencia de conducir', 'Pasaporte', 'Otra', 'No presentó'];
+const CONFIRMACIONES = ['Llamada a la familia', 'Aviso por escrito de la familia', 'Autorización de la dirección'];
 
 /* ================= API ================= */
 
 const API = {
   version, entrar, salir,
   datosPadre, cambiarQR, cambiarPin, cambiarContacto, agregarPersona, quitarPersona,
-  buscarQR, abrirAlumno, registrarSalida, entregarTransporte, deshacerSalida,
+  buscarQR, abrirAlumno, registrarSalida, entregarTransporte, deshacerSalida, marcarAsistencia,
   datosMaestro, darPermiso, quitarPermiso, listaPermisos,
   resumenDir, listaGrupo, buscarAlumnos, fichaAlumno, altaAlumno, editarAlumno, fotoAlumno,
   editarFamilia, restablecerPin, listaMaestros, guardarMaestro, transporteDir, guardarConfig, vincularHermano, separarFamilia, borrarDatosDir,
@@ -94,9 +100,15 @@ function migrar() {
   const c = CacheService.getScriptCache();
   if (c.get('esquema') === String(VERSION)) return;
   Object.keys(HOJAS).forEach(n => {
-    const sh = hoja(n);
-    if (!sh) return;
+    let sh = hoja(n);
     const enc = HOJAS[n];
+    if (!sh) {
+      sh = SpreadsheetApp.getActive().insertSheet(n);
+      sh.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight('bold').setBackground('#dbefee');
+      sh.setFrozenRows(1);
+      (TEXTO[n] || []).forEach(col => sh.getRange(2, enc.indexOf(col) + 1, sh.getMaxRows() - 1, 1).setNumberFormat('@'));
+      return;
+    }
     const actual = sh.getRange(1, 1, 1, enc.length).getValues()[0].map(x => String(x || '').trim());
     const usadas = actual.filter(x => x !== '').length;
     if (usadas < enc.length && enc.slice(0, usadas).every((k, i) => actual[i] === k))
@@ -127,7 +139,7 @@ const CLAVE_MAESTROS_PRUEBA = 'maestro2026';
 // Deja vacías las hojas de datos (no toca Config ni la carpeta de fotos)
 function borrarTodo() {
   conBloqueo(() => {
-    ['Alumnos', 'Familias', 'Personas', 'Maestros', 'Salidas', 'Permisos'].forEach(n => {
+    ['Alumnos', 'Familias', 'Personas', 'Maestros', 'Salidas', 'Permisos', 'Asistencia'].forEach(n => {
       const h = hoja(n);
       if (h.getLastRow() > 1) h.getRange(2, 1, h.getLastRow() - 1, HOJAS[n].length).clearContent();
     });
@@ -334,7 +346,25 @@ const personasDe = famId => filas('Personas').filter(p => p.FamiliaID === famId)
   .map(p => ({ id: p.ID, nombre: p.Nombre, parentesco: p.Parentesco, foto: fotoDataUrl(p.FotoID) }));
 
 const salidaCorta = x => ({ fecha: x.Fecha, hora: x.Hora, alumno: x.Alumno, grupo: x.Grupo, recogio: x.Recogio, parentesco: x.Parentesco,
-  entrego: x.Entrego, tipo: x.Tipo || 'Normal', motivo: x.Motivo || '' });
+  entrego: x.Entrego, tipo: x.Tipo || 'Normal', motivo: x.Motivo || '', telefono: x.Telefono || '', identificacion: x.Identificacion || '',
+  confirmo: x.Confirmo || '' });
+
+/* ---------- Asistencia del día ---------- */
+// { AlumnoID: fila de hoy } (la última marca cuenta)
+function asistenciaHoy() {
+  const m = {};
+  filas('Asistencia').filter(x => x.Fecha === hoy()).forEach(x => { m[x.AlumnoID] = x; });
+  return m;
+}
+const estadoHoy = (a, asis) => (asis[a.ID] || {}).Estado || '';
+const rutasEscuela = alumnos => alumnos.map(x => x.Transporte).filter((x, i, arr) => x && arr.indexOf(x) === i).sort();
+// Ruta con la que se va HOY (vacío si no usa transporte hoy o faltó)
+function transporteHoy(a, asis) {
+  const e = estadoHoy(a, asis);
+  if (e === 'Faltó' || e === 'Recogen') return '';
+  if (e === 'Transporte') return a.Transporte || (asis[a.ID].Nota || 'Transporte');
+  return a.Transporte;
+}
 const nombreCorto = a => a.Nombre.split(' ')[0];
 const tipoMaestro = m => m.Tipo === 'Jornada ampliada' ? 'Jornada ampliada' : 'Titular';
 // Maestros de un grupo: primero el titular, luego el de jornada ampliada
@@ -429,12 +459,12 @@ function datosPadre(token) {
   const fam = filas('Familias').find(f => f.ID === s.fam);
   if (!fam) throw new Error('Tu sesión terminó. Vuelve a entrar.');
   const maestros = filas('Maestros');
-  const salidas = filas('Salidas');
+  const salidas = filas('Salidas'), asis = asistenciaHoy();
   const hijos = filas('Alumnos').filter(a => a.FamiliaID === s.fam && a.Activo !== 'NO')
     .sort((a, b) => grado(b.Grupo) - grado(a.Grupo))
     .map(a => {
       const x = salidas.filter(y => y.AlumnoID === a.ID && y.Fecha === hoy()).pop();
-      return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: a.Transporte,
+      return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: a.Transporte, asistencia: estadoHoy(a, asis),
         maestro: nombresDe(a.Grupo, maestros, 'Por asignar'), hoy: x ? salidaCorta(x) : null };
     });
   const ids = hijos.map(h => h.id);
@@ -531,24 +561,28 @@ function maestroDeSesion(s, maestros) {
 
 // Todo lo que el maestro necesita ver para entregar a un alumno (y a sus hermanos)
 function datosEntrega(s, a) {
-  const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos();
+  const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos(), asis = asistenciaHoy();
   const yo = maestroDeSesion(s, maestros);
   const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
   const titular = g => nombresDe(g, maestros, 'Sin maestro');
+  const fam = filas('Familias').find(f => f.ID === a.FamiliaID) || {};
   const salidaDe = id => { const x = salHoy.filter(y => y.AlumnoID === id).pop(); return x ? salidaCorta(x) : null; };
   const permiso = nivelPermiso(yo, a, permisos);
   return {
     valido: true,
-    alumno: { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, foto: fotoDataUrl(a.FotoID), titular: titular(a.Grupo), transporte: a.Transporte },
+    alumno: { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, foto: fotoDataUrl(a.FotoID), titular: titular(a.Grupo),
+      transporte: transporteHoy(a, asis), ruta: a.Transporte, asistencia: estadoHoy(a, asis) },
     permiso,
+    familia: permiso === 'no' ? null : { tutor: fam.Tutor || '', telefono: fam.Telefono || '' },
     salida: salidaDe(a.ID),
     puedeDeshacer: puedeDeshacer(yo, salHoy.filter(y => y.AlumnoID === a.ID).pop()),
     personas: permiso === 'no' ? [] : personasDe(a.FamiliaID),
     hermanos: alumnos.filter(x => x.FamiliaID === a.FamiliaID && x.ID !== a.ID && x.Activo !== 'NO').map(x => ({
-      id: x.ID, nombre: x.Nombre, grupo: x.Grupo, titular: titular(x.Grupo), transporte: x.Transporte,
+      id: x.ID, nombre: x.Nombre, grupo: x.Grupo, titular: titular(x.Grupo), transporte: transporteHoy(x, asis), asistencia: estadoHoy(x, asis),
       permiso: nivelPermiso(yo, x, permisos), salida: salidaDe(x.ID) })),
     horaSalida: horaSalida(),
-    temprana: ahora() < horaSalida()
+    temprana: ahora() < horaSalida(),
+    identificaciones: IDENTIFICACIONES, confirmaciones: CONFIRMACIONES
   };
 }
 
@@ -575,7 +609,8 @@ function abrirAlumno(token, id) {
 
 /*
  * Registra la salida de uno o varios alumnos (hermanos) a la vez.
- * extra: { hermanos: [ids], transporte: true/false, motivo: '...', via: 'QR' | 'Lista' }
+ * extra: { hermanos: [ids], transporte: true/false, motivo: '...', via: 'QR' | 'Lista',
+ *          otra: { nombre, parentesco, telefono, identificacion, confirmo, foto } }  ← persona NO autorizada
  * Antes de la hora de salida se registra como "Temprana" y pide motivo.
  */
 function registrarSalida(token, alumnoId, personaId, extra) {
@@ -599,30 +634,96 @@ function entregarTransporte(token, ids) {
 
 function registrarVarios(s, ids, personaId, extra) {
   return conBloqueo(() => {
-    const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos();
+    const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos(), asis = asistenciaHoy();
     const yo = maestroDeSesion(s, maestros);
     const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
-    const persona = extra.transporte ? null : filas('Personas').find(x => x.ID === personaId);
-    if (!extra.transporte && !persona) throw new Error('Toca la foto de quien recoge al alumno.');
+    const otra = !extra.transporte && extra.otra ? validarOtra(extra.otra) : null;
+    const persona = extra.transporte || otra ? null : filas('Personas').find(x => x.ID === personaId);
+    if (!extra.transporte && !otra && !persona) throw new Error('Toca la foto de quien recoge al alumno.');
     const hora = ahora(), temprana = hora < horaSalida(), motivo = txt(extra.motivo);
     const regs = ids.map(id => {
       const a = alumnos.find(x => x.ID === id && x.Activo !== 'NO');
       if (!a) throw new Error('Alumno no encontrado.');
       if (nivelPermiso(yo, a, permisos) === 'no') throw new Error('No tienes permiso para entregar a ' + nombreCorto(a) + ' (' + a.Grupo + ').');
       if (salHoy.some(x => x.AlumnoID === a.ID)) throw new Error(nombreCorto(a) + ' ya tiene salida registrada hoy.');
+      if (estadoHoy(a, asis) === 'Faltó') throw new Error(nombreCorto(a) + ' está marcado(a) como falta hoy. Quita la falta para darle salida.');
       const r = { Fecha: hoy(), Hora: hora, AlumnoID: a.ID, Alumno: a.Nombre, Grupo: a.Grupo, Entrego: yo ? yo.Nombre : 'Dirección',
         Via: extra.via === 'Lista' ? 'Lista' : 'QR', Motivo: motivo, _fam: a.FamiliaID };
       if (extra.transporte) {
-        if (!a.Transporte) throw new Error(nombreCorto(a) + ' no tiene transporte asignado.');
-        return Object.assign(r, { Tipo: 'Transporte', Recogio: 'Transporte ' + a.Transporte, Parentesco: '', FotoID: '' });
+        const ruta = transporteHoy(a, asis);
+        if (!ruta) throw new Error(nombreCorto(a) + ' no se va en transporte hoy.');
+        return Object.assign(r, { Tipo: 'Transporte', Recogio: 'Transporte ' + ruta, Parentesco: '', FotoID: '' });
       }
-      if (persona.FamiliaID !== a.FamiliaID) throw new Error(persona.Nombre + ' no está autorizado(a) para ' + nombreCorto(a) + '.');
       if (temprana && !motivo) throw new Error('Es salida temprana: elige el motivo.');
+      if (otra) return Object.assign(r, { Tipo: 'No autorizado', Recogio: otra.nombre, Parentesco: otra.parentesco, FotoID: '',
+        Telefono: otra.telefono, Identificacion: otra.identificacion, Confirmo: otra.confirmo,
+        Motivo: temprana ? 'Salida temprana: ' + motivo : motivo });
+      if (persona.FamiliaID !== a.FamiliaID) throw new Error(persona.Nombre + ' no está autorizado(a) para ' + nombreCorto(a) + '.');
       return Object.assign(r, { Tipo: temprana ? 'Temprana' : 'Normal', Recogio: persona.Nombre, Parentesco: persona.Parentesco, FotoID: persona.FotoID });
     });
+    if (otra) {  // la foto se guarda una sola vez, ya validado todo
+      const foto = guardarFoto(otra.foto, 'No autorizado ' + hoy() + ' ' + otra.nombre);
+      if (!foto) throw new Error('No se pudo guardar la foto. Tómala otra vez.');
+      regs.forEach(r => { r.FotoID = foto; });
+    }
     regs.forEach(r => agregar('Salidas', r));  // primero se valida todo, luego se escribe
     return regs;
   });
+}
+
+// Datos obligatorios cuando recoge alguien que NO está en los autorizados de la familia
+function validarOtra(o) {
+  const d = { nombre: txt(o.nombre), parentesco: txt(o.parentesco), telefono: txt(o.telefono).replace(/[^\d+ ]/g, ''),
+    identificacion: txt(o.identificacion), confirmo: txt(o.confirmo), foto: txt(o.foto) };
+  if (d.nombre.split(/\s+/).length < 2) throw new Error('Escribe el nombre completo de quien recoge.');
+  if (!d.parentesco) throw new Error('Escribe el parentesco o relación con el alumno.');
+  if (d.telefono.replace(/\D/g, '').length < 10) throw new Error('Escribe un teléfono de 10 dígitos de quien recoge.');
+  if (IDENTIFICACIONES.indexOf(d.identificacion) < 0) throw new Error('Elige la identificación que presentó.');
+  if (CONFIRMACIONES.indexOf(d.confirmo) < 0) throw new Error('Elige cómo se confirmó con la familia o la dirección.');
+  if (!/^data:image\//.test(d.foto)) throw new Error('Toma la foto de la persona que recoge.');
+  return d;
+}
+
+/*
+ * Pase de lista antes de la salida. estado: 'Faltó' · 'Transporte' · 'Recogen' · '' (presente / quitar marca)
+ * Lo marca el maestro del grupo (o con permiso) o la dirección. Al marcar falta se avisa a la familia.
+ */
+function marcarAsistencia(token, ids, estado, nota) {
+  const s = sesion(token, ['maestro', 'dir']);
+  ids = [].concat(ids || []);
+  estado = txt(estado);
+  if (estado && ESTADOS.indexOf(estado) < 0) throw new Error('Estado no válido.');
+  const cambios = conBloqueo(() => {
+    const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos();
+    const yo = maestroDeSesion(s, maestros);
+    const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
+    const previas = filas('Asistencia').filter(x => x.Fecha === hoy() && ids.indexOf(x.AlumnoID) >= 0);
+    const res = ids.map(id => {
+      const a = alumnos.find(x => x.ID === id && x.Activo !== 'NO');
+      if (!a) throw new Error('Alumno no encontrado.');
+      if (nivelPermiso(yo, a, permisos) === 'no') throw new Error('No puedes pasar lista a ' + nombreCorto(a) + ' (' + a.Grupo + ').');
+      if (estado === 'Faltó' && salHoy.some(x => x.AlumnoID === a.ID)) throw new Error(nombreCorto(a) + ' ya tiene salida registrada hoy.');
+      if (estado === 'Recogen' && !a.Transporte) throw new Error(nombreCorto(a) + ' no tiene transporte asignado.');
+      const antes = (previas.filter(x => x.AlumnoID === a.ID).pop() || {}).Estado || '';
+      return { a, antes };
+    });
+    previas.sort((x, y) => y._fila - x._fila).forEach(r => hoja('Asistencia').deleteRow(r._fila));
+    if (estado) res.forEach(({ a }) => agregar('Asistencia', { Fecha: hoy(), AlumnoID: a.ID, Alumno: a.Nombre, Grupo: a.Grupo,
+      Estado: estado, Nota: txt(nota), Marco: yo ? yo.Nombre : 'Dirección', Hora: ahora() }));
+    return res;
+  });
+  // Avisos a la familia: al marcar falta y al corregirla
+  const familias = filas('Familias');
+  cambios.forEach(({ a, antes }) => {
+    const fam = familias.find(f => f.ID === a.FamiliaID);
+    if (!fam || !fam.Correo || antes === estado) return;
+    if (estado === 'Faltó') enviarCorreo(fam, 'Inasistencia de ' + nombreCorto(a) + ' – ' + hoy(),
+      '<p>Hola, ' + fam.Tutor + ':</p><p>Hoy ' + hoy() + ' <b>' + a.Nombre + '</b> (' + a.Grupo + ') fue registrado(a) como <b>ausente</b> en el pase de lista.</p>' +
+      '<p style="color:#666">Si tu hijo(a) salió de casa hacia la escuela, comunícate de inmediato con la escuela.</p>');
+    else if (antes === 'Faltó') enviarCorreo(fam, 'Corrección: ' + nombreCorto(a) + ' sí está en la escuela',
+      '<p>Hola, ' + fam.Tutor + ':</p><p>Se corrigió el pase de lista: <b>' + a.Nombre + '</b> sí está hoy en la escuela.</p>');
+  });
+  return { n: cambios.length, estado };
 }
 
 // Un correo por familia con todos sus hijos
@@ -637,7 +738,10 @@ function notificar(regs) {
     const nombres = rs.map(x => '<b>' + x.Alumno + '</b> (' + x.Grupo + ')').join(' y ');
     const como = r.Tipo === 'Transporte' ? 'subió al <b>' + r.Recogio + '</b>'
       : 'salió con <b>' + r.Recogio + '</b> (' + r.Parentesco + ')';
-    const extra = r.Tipo === 'Temprana' ? '<p>Salida temprana. Motivo: ' + r.Motivo + '.</p>' : '';
+    let extra = r.Tipo === 'Temprana' ? '<p>Salida temprana. Motivo: ' + r.Motivo + '.</p>' : '';
+    if (r.Tipo === 'No autorizado') extra = '<p style="background:#fff4d6;padding:8px;border-radius:6px"><b>Esta persona no está en tu lista de autorizados.</b> ' +
+      'Se le tomó foto y datos: teléfono ' + r.Telefono + ', identificación: ' + r.Identificacion + '. Se confirmó por: ' + r.Confirmo + '.' +
+      (r.Motivo ? ' ' + r.Motivo + '.' : '') + '</p><p>Si va a recogerlo(a) seguido, agrégala en «Autorizados» de la aplicación.</p>';
     return enviarCorreo(fam, 'Salida de ' + rs.map(x => x.Alumno.split(' ')[0]).join(' y ') + ' – ' + r.Hora,
       '<p>Hola, ' + fam.Tutor + ':</p><p>' + nombres + (rs.length > 1 ? ' salieron' : '') + ' hoy ' + r.Fecha + ' a las <b>' + r.Hora +
       '</b>: ' + (rs.length > 1 ? como.replace('salió con', 'con').replace('subió al', 'en el') : como) + '.</p>' + extra +
@@ -686,10 +790,10 @@ function datosMaestro(token) {
   const yo = maestroDeSesion(s, maestros);
   const alumnos = filas('Alumnos').filter(a => a.Activo !== 'NO');
   const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
-  const permisos = permisosActivos();
+  const permisos = permisosActivos(), asis = asistenciaHoy();
   const item = a => {
     const x = salHoy.filter(y => y.AlumnoID === a.ID).pop();
-    return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: a.Transporte,
+    return { id: a.ID, nombre: a.Nombre, grupo: a.Grupo, qr: a.QR, transporte: transporteHoy(a, asis), ruta: a.Transporte, asistencia: estadoHoy(a, asis),
       salida: x ? Object.assign(salidaCorta(x), { mia: x.Entrego === yo.Nombre }) : null };
   };
   const mios = alumnos.filter(a => a.Grupo === yo.Grupo).sort(porNombre);
@@ -709,7 +813,8 @@ function datosMaestro(token) {
   }));
   return {
     yo: { nombre: yo.Nombre, grupo: yo.Grupo, tipo: tipoMaestro(yo) }, horaSalida: horaSalida(), temprana: ahora() < horaSalida(),
-    grupo: mios.map(item), extras, hermanos,
+    grupo: mios.map(item), extras, hermanos, rutas: rutasEscuela(alumnos),
+    listaPasada: mios.some(a => asis[a.ID]),
     alumnosGrupo: mios.map(a => ({ id: a.ID, nombre: a.Nombre })),
     maestros: maestros.filter(m => m.ID !== yo.ID && m.Grupo !== yo.Grupo).sort((a, b) => GRUPOS.indexOf(a.Grupo) - GRUPOS.indexOf(b.Grupo))
       .map(m => ({ id: m.ID, nombre: m.Nombre, grupo: m.Grupo })),
@@ -794,14 +899,18 @@ function resumenDir(token) {
   const alumnos = filas('Alumnos').filter(a => a.Activo !== 'NO');
   const maestros = filas('Maestros');
   const salidasHoy = filas('Salidas').filter(x => x.Fecha === hoy());
+  const asis = asistenciaHoy();
+  const faltan = a => estadoHoy(a, asis) === 'Faltó';
   const conteo = {};
   GRUPOS.forEach(g => conteo[g] = { alumnos: alumnos.filter(a => a.Grupo === g).length, salidas: salidasHoy.filter(x => x.Grupo === g).length,
-    maestro: nombresDe(g, maestros, '') });
-  const enTransporte = alumnos.filter(a => a.Transporte);
+    faltas: alumnos.filter(a => a.Grupo === g && faltan(a)).length, maestro: nombresDe(g, maestros, '') });
+  const enTransporte = alumnos.filter(a => transporteHoy(a, asis));
   return {
     grupos: GRUPOS, conteo, total: alumnos.length, salidasHoy: salidasHoy.length, maestros: maestros.length,
     transporte: { total: enTransporte.length, entregados: enTransporte.filter(a => salidasHoy.some(x => x.AlumnoID === a.ID)).length },
     tempranas: salidasHoy.filter(x => x.Tipo === 'Temprana').length,
+    faltas: alumnos.filter(faltan).length,
+    noAutorizados: salidasHoy.filter(x => x.Tipo === 'No autorizado').length,
     permanentes: permisosActivos().filter(p => p.Duracion === 'siempre').length,
     horaSalida: horaSalida(),
     ultimas: salidasHoy.slice(-8).reverse().map(salidaCorta),
@@ -836,7 +945,7 @@ function fichaAlumno(token, id) {
   const maestros = filas('Maestros');
   return {
     alumno: { id: a.ID, nombre: a.Nombre, curp: a.CURP, grupo: a.Grupo, qr: a.QR, activo: a.Activo !== 'NO', foto: fotoDataUrl(a.FotoID), transporte: a.Transporte },
-    rutas: alumnos.map(x => x.Transporte).filter((x, i, arr) => x && arr.indexOf(x) === i).sort(),
+    rutas: rutasEscuela(alumnos),
     permisos: permisosActivos().filter(p => p.AlumnoID ? p.AlumnoID === a.ID : p.Grupo === a.Grupo).map(p => describirPermiso(p, maestros, alumnos)),
     maestros: maestros.filter(m => m.Grupo !== a.Grupo).sort((x, y) => GRUPOS.indexOf(x.Grupo) - GRUPOS.indexOf(y.Grupo)).map(m => ({ id: m.ID, nombre: m.Nombre, grupo: m.Grupo })),
     familia: { id: f.ID, tutor: f.Tutor, pin: f.PIN, correo: f.Correo, telefono: f.Telefono },
@@ -973,11 +1082,11 @@ function restablecerPin(token, famId) {
 function transporteDir(token) {
   sesion(token, ['dir']);
   const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
-  const rutas = {};
-  filas('Alumnos').filter(a => a.Activo !== 'NO' && a.Transporte).sort((a, b) => GRUPOS.indexOf(a.Grupo) - GRUPOS.indexOf(b.Grupo) || porNombre(a, b))
+  const rutas = {}, asis = asistenciaHoy();
+  filas('Alumnos').filter(a => a.Activo !== 'NO' && transporteHoy(a, asis)).sort((a, b) => GRUPOS.indexOf(a.Grupo) - GRUPOS.indexOf(b.Grupo) || porNombre(a, b))
     .forEach(a => {
-      const x = salHoy.filter(y => y.AlumnoID === a.ID).pop();
-      (rutas[a.Transporte] = rutas[a.Transporte] || []).push({ id: a.ID, nombre: a.Nombre, grupo: a.Grupo, salida: x ? salidaCorta(x) : null });
+      const x = salHoy.filter(y => y.AlumnoID === a.ID).pop(), ruta = transporteHoy(a, asis);
+      (rutas[ruta] = rutas[ruta] || []).push({ id: a.ID, nombre: a.Nombre, grupo: a.Grupo, transporte: ruta, asistencia: estadoHoy(a, asis), salida: x ? salidaCorta(x) : null });
     });
   return Object.keys(rutas).sort().map(r => ({ ruta: r, alumnos: rutas[r] }));
 }
@@ -1098,15 +1207,33 @@ function reporte(token, f) {
   ).reverse().map(salidaCorta);
 }
 
+function reporteAsistencia(f) {
+  f = f || {};
+  return filas('Asistencia').filter(x => (!f.grupo || x.Grupo === f.grupo) && (!f.desde || x.Fecha >= f.desde) && (!f.hasta || x.Fecha <= f.hasta) &&
+    (!f.alumno || x.Alumno.toLowerCase().indexOf(txt(f.alumno).toLowerCase()) >= 0)).reverse();
+}
+
 function exportarExcel(token, f) {
   const rows = reporte(token, f);
   const tmp = SpreadsheetApp.create('Reporte salidas ' + hoy());
-  const datos = [['Fecha', 'Hora', 'Alumno', 'Grupo', 'Tipo', 'Recogió', 'Parentesco', 'Motivo', 'Entregó']]
-    .concat(rows.map(r => [r.fecha, r.hora, r.alumno, r.grupo, r.tipo, r.recogio, r.parentesco, r.motivo, r.entrego]));
+  const fotoDe = {};
+  filas('Salidas').forEach(x => { if (x.Tipo === 'No autorizado' && x.FotoID) fotoDe[x.Fecha + x.Hora + x.Alumno] = 'https://drive.google.com/file/d/' + x.FotoID + '/view'; });
+  const datos = [['Fecha', 'Hora', 'Alumno', 'Grupo', 'Tipo', 'Recogió', 'Parentesco', 'Motivo', 'Entregó', 'Teléfono', 'Identificación', 'Confirmó', 'Foto']]
+    .concat(rows.map(r => [r.fecha, r.hora, r.alumno, r.grupo, r.tipo, r.recogio, r.parentesco, r.motivo, r.entrego, r.telefono, r.identificacion, r.confirmo,
+      fotoDe[r.fecha + r.hora + r.alumno] || '']));
   const sh = tmp.getSheets()[0];
-  sh.getRange(1, 1, datos.length, 9).setNumberFormat('@').setValues(datos);
-  sh.getRange(1, 1, 1, 9).setFontWeight('bold');
-  sh.autoResizeColumns(1, 9);
+  sh.setName('Salidas');
+  sh.getRange(1, 1, datos.length, 13).setNumberFormat('@').setValues(datos);
+  sh.getRange(1, 1, 1, 13).setFontWeight('bold');
+  sh.autoResizeColumns(1, 13);
+  // Inasistencias y cambios de transporte del mismo periodo (para estadística)
+  const as = reporteAsistencia(f);
+  const sh2 = tmp.insertSheet('Asistencia');
+  const d2 = [['Fecha', 'Alumno', 'Grupo', 'Estado', 'Marcó', 'Hora']].concat(as.map(x => [x.Fecha, x.Alumno, x.Grupo,
+    x.Estado === 'Recogen' ? 'No usó transporte' : x.Estado === 'Transporte' ? 'Se fue en transporte' : x.Estado, x.Marco, x.Hora]));
+  sh2.getRange(1, 1, d2.length, 6).setNumberFormat('@').setValues(d2);
+  sh2.getRange(1, 1, 1, 6).setFontWeight('bold');
+  sh2.autoResizeColumns(1, 6);
   SpreadsheetApp.flush();
   const blob = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + tmp.getId() + '/export?format=xlsx',
     { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } }).getBlob();
@@ -1124,7 +1251,8 @@ function cerrarCiclo() {
       else { actualizar('Alumnos', a._fila, { Grupo: (g + 1) + '°' + a.Grupo.slice(-1) }); subieron++; }
     });
     hoja('Salidas').copyTo(SpreadsheetApp.getActive()).setName('Salidas hasta ' + hoy() + ' ' + ahora().replace(':', ''));
-    ['Salidas', 'Permisos'].forEach(n => {
+    hoja('Asistencia').copyTo(SpreadsheetApp.getActive()).setName('Asistencia hasta ' + hoy() + ' ' + ahora().replace(':', ''));
+    ['Salidas', 'Permisos', 'Asistencia'].forEach(n => {
       const h = hoja(n);
       if (h.getLastRow() > 1) h.getRange(2, 1, h.getLastRow() - 1, HOJAS[n].length).clearContent();
     });
