@@ -50,7 +50,7 @@ p{margin:0}
 .btn svg{width:24px;height:24px;flex:none}
 button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 input,select{font:inherit;font-size:16px;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);width:100%}
-label.f{display:flex;flex-direction:column;gap:5px;font-size:.88rem;font-weight:500}
+label.f,div.f{display:flex;flex-direction:column;gap:5px;font-size:.88rem;font-weight:500}
 .form{display:flex;flex-direction:column;gap:12px}
 .av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:600;color:#fff;flex:none;object-fit:cover;background:var(--accent);font-size:.9rem}
 .av.lg{width:84px;height:84px;border-radius:16px;font-size:1.4rem}
@@ -230,11 +230,14 @@ const GUIAS={
   padre:{
     bienvenida:[[I.qr,'Este es el código de tu hijo(a)','En «Mis hijos» está el código QR de cada uno. La persona que lo recoja debe mostrarlo al maestro a la hora de la salida.'],
       [I.people,'Di quién puede recogerlo','En «Autorizados» agrega con foto a quien pasa por tu hijo: mamá, papá, abuelos… El maestro verá esa foto antes de entregarlo.'],
-      [I.clock,'Te avisamos cada salida','Recibes un correo cada vez que sale y lo puedes ver en «Historial». Escribe tu correo en «Cuenta».']],
+      [I.clock,'Te avisamos cada salida','Recibes un correo cada vez que sale y lo puedes ver en «Historial». Escribe tu correo en «Cuenta».'],
+      [I.qr,'¿Quieres verlo paso a paso?','En «Mis hijos» y en «Ayuda» hay un video que explica todo: entrar, guardar el código y registrar personas con foto.']],
     pasos:[['Abre «Mis hijos»','Ahí está el código QR de cada hijo inscrito.'],['Guarda el código','Toma captura de pantalla, imprímelo o pégalo en la credencial. Así funciona aunque no tengas internet.'],
       ['Agrega a los autorizados','En «Autorizados» escribe nombre y parentesco, y toma una foto del rostro.'],['A la hora de la salida','Quien recoge muestra el código al maestro. El maestro revisa la foto y registra la salida.'],
       ['Recibe el aviso','Te llega un correo y la salida queda en «Historial».']],
-    faq:[['Perdí el código o lo tiene alguien que no quiero','En «Mis hijos» toca «Cambiar código QR». El anterior deja de funcionar en ese momento.'],
+    faq:[['¿Cómo agrego a alguien que puede recoger a mi hijo?','En «Autorizados» escribe su nombre completo, elige el parentesco, toca «Tomar o elegir foto» (de frente y con buena luz) y luego «Agregar». Solo mayores de 18 años.'],
+      ['Viene alguien que no registré','La escuela te llamará para confirmar. Si no te localiza, no lo entrega. Si sí, le toma datos y foto y te llega un correo.'],
+      ['Perdí el código o lo tiene alguien que no quiero','En «Mis hijos» toca «Cambiar código QR». El anterior deja de funcionar en ese momento.'],
       ['Olvidé mi PIN','Pídelo en la dirección de la escuela. Después puedes cambiarlo en «Cuenta».'],
       ['Tengo varios hijos en la escuela','Todos aparecen en tu cuenta. Entras con el CURP del hijo mayor.'],
       ['¿Necesito internet a la salida?','Para mostrar el código no, si lo guardaste en captura o impreso.']],
@@ -434,7 +437,8 @@ const V={
 padre_hijos(){
   const d=D.padre;if(!d)return cargando;
   if(!d.hijos.length)return '<p class="muted">No hay alumnos activos en tu cuenta.</p>';
-  let h=`<section class="card"><h3>Cómo se usa</h3><ol class="pasos"><li><b>Guarda el código</b><span>Toma captura de pantalla o imprímelo. Funciona sin internet.</span></li><li><b>Muéstralo a la salida</b><span>Quien recoja a tu hijo enseña el código al maestro.</span></li></ol></section>`;
+  let h=`<section class="card"><h3>Cómo se usa</h3><ol class="pasos"><li><b>Guarda el código</b><span>Toma captura de pantalla o imprímelo. Funciona sin internet.</span></li><li><b>Muéstralo a la salida</b><span>Quien recoja a tu hijo enseña el código al maestro.</span></li></ol>
+  <button class="btn full" data-a="vervideo">▶ Ver el video de cómo usar la aplicación (2½ min)</button></section>`;
   if(!d.personas.length)h+=`<div class="aviso">${I.people}<div class="grow"><b>Falta decir quién puede recogerlo</b><p class="muted">Sin personas autorizadas el maestro no podrá entregarlo.</p></div><button class="btn sm pri" data-tab="personas">Agregar</button></div>`;
   if(!d.correo)h+=`<div class="aviso">${I.clock}<div class="grow"><b>Recibe un aviso en cada salida</b><p class="muted">Escribe tu correo en Cuenta.</p></div><button class="btn sm" data-tab="cuenta">Agregar</button></div>`;
   return h+d.hijos.map(s=>`<section class="card"><div class="row"><div class="grow"><h2>${esc(s.nombre)}</h2><span class="muted">${esc(s.grupo)} · ${esc(s.maestro)}</span></div>${s.transporte?`<span class="pill">${I.bus}${esc(s.transporte)}</span>`:''}</div>
@@ -446,6 +450,7 @@ padre_hijos(){
 padre_personas(){
   const d=D.padre;if(!d)return cargando;
   return `<section class="card"><h2>¿Quién puede recoger a tus hijos?</h2><p class="muted">El maestro verá la foto al escanear el código. Agrega a todas las personas que pasan por ellos.</p>
+  <button class="btn sm" style="align-self:flex-start" data-a="vervideo" data-t="66.5">▶ Video: cómo registrar a una persona</button>
   <div class="list">${d.personas.map(p=>`<div class="item">${av(p.nombre,p.foto,'lg')}<div class="grow"><b>${esc(p.nombre)}</b><span class="s">${esc(p.parentesco)}</span></div>
   ${confirmar==='p'+p.id?`<button class="btn warn sm" data-a="quitarp" data-id="${p.id}">Confirmar</button>`:`<button class="btn sm" data-a="pedir" data-k="p${p.id}">Quitar</button>`}</div>`).join('')||'<p class="muted">Todavía no hay personas. Agrega al menos una.</p>'}</div></section>
   ${formPersona()}`;
@@ -600,7 +605,9 @@ function formPersona(famId){
   return `<form class="card form" id="f-persona" ${famId?`data-fam="${esc(famId)}"`:''}><h3>Agregar persona autorizada</h3>
   <label class="f" for="pn">Nombre completo<input id="pn" required autocomplete="off"></label>
   <label class="f" for="pr">Parentesco<select id="pr">${PARENTESCOS.map(x=>`<option>${x}</option>`).join('')}</select></label>
-  <label class="f" for="pf">Foto del rostro<input id="pf" type="file" accept="image/*" required></label>
+  <div class="f"><span>Foto del rostro</span><img id="pfprev" class="fotoprev" hidden alt="Foto elegida">
+  <label class="btn full" for="pf" id="pfb">${I.person} Tomar o elegir foto<input id="pf" type="file" accept="image/*" hidden></label>
+  <span class="ayudita">De frente, con buena luz, sin lentes oscuros ni gorra.</span></div>
   <button class="btn pri full" type="submit">Agregar</button></form>`;
 }
 
@@ -646,6 +653,12 @@ ayuda(){
   ${G.video?`<section class="card"><h2>Video instructivo</h2><video src="${G.video}" controls playsinline preload="metadata" style="width:100%;max-height:70vh;border-radius:12px;background:#000"></video></section>`:''}
   <section class="card"><h2>Preguntas frecuentes</h2>${G.faq.map(([q,a])=>`<details><summary>${esc(q)}</summary><p class="muted">${esc(a)}</p></details>`).join('')}</section>
   <button class="btn full" data-a="verguia">Ver otra vez la guía de bienvenida</button>`;
+},
+video(s){
+  const v=GUIAS[ses.rol].video;
+  return `<h1>Video de ayuda</h1><section class="card"><video id="vid" src="${v}" controls playsinline autoplay preload="auto" style="width:100%;max-height:75vh;border-radius:12px;background:#000"></video>
+  ${ses.rol==='padre'?`<h3>Ir a una parte</h3><div class="chips envolver">${[['Entrar',3.8],['Código QR',36.9],['Registrar personas',66.5],['Avisos y PIN',115.7],['Persona no registrada',135.8]].map(([l,t])=>`<button data-a="saltar" data-t="${t}">${l}</button>`).join('')}</div>`:''}
+  <p class="muted">También lo puedes compartir: mándale a quien recoge a tu hijo el enlace de la aplicación.</p></section>`;
 },
 entrega(){
   if(!E||!E.res)return cargando;
@@ -976,6 +989,8 @@ document.addEventListener('click',async e=>{
   switch(a){
     case 'salir':return cerrarSesion();
     case 'ayuda':return abrir({t:'ayuda'});
+    case 'vervideo':{abrir({t:'video'});const t=+b.dataset.t||0;const v=$('vid');if(v&&t){v.addEventListener('loadedmetadata',()=>{v.currentTime=t},{once:true})}return}
+    case 'saltar':{const v=$('vid');if(v){v.currentTime=+b.dataset.t;v.play().catch(()=>{});v.scrollIntoView({block:'center'})}return}
     case 'verguia':return mostrarGuia(true);
     case 'guiasig':guiaPaso++;return pintarGuia();
     case 'guiacerrar':return cerrarGuia();
@@ -1073,6 +1088,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.name==='pk'&&E){E.persona=t.value;return}
+  if(t.id==='pf'){const f=t.files[0],im=$('pfprev');if(f&&im){im.src=URL.createObjectURL(f);im.hidden=false;$('pfb').firstChild&&($('pfb').childNodes[1].textContent=' Cambiar foto')}return}
   if(t.id==='onf'&&t.files[0]&&E){await hacer(null,async()=>{guardarOtra();E.od=E.od||{};E.od.foto=await leerFoto(t.files[0]);render()});return}
   if(t.dataset.h&&E){E.hermanos[t.dataset.h]=t.checked;const b=$('btnreg');if(b)b.innerHTML=botonRegistrar();return}
   if(t.id==='fa'&&t.files[0]){await hacer(null,async()=>{toast('Subiendo foto…');await api('fotoAlumno',tok(),sub().id,await leerFoto(t.files[0]));toast('Foto actualizada.');await cargarSub()})}
