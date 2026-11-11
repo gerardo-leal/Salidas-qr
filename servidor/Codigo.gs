@@ -8,7 +8,7 @@
  */
 
 const TZ = 'America/Monterrey';
-const VERSION = 5;
+const VERSION = 6;
 const TIPOS_MAESTRO = ['Titular', 'Jornada ampliada'];
 const HORA_SALIDA_DEFAULT = '14:30';
 const DIAS_SESION = 30;
@@ -91,6 +91,7 @@ function instalar() {
      ['usuario_direccion', 'direccion'],
      ['contrasena_direccion', clave],
      ['carpeta_fotos', carpeta.getId()]].forEach(r => hoja('Config').appendRow(r));
+  _cfg = null;
     avisar('Instalación lista.\n\nUsuario de dirección: direccion\nContraseña: ' + clave +
       '\n\nAnótala. Podrás cambiarla desde la página (Más → Contraseña).');
   }
@@ -100,6 +101,17 @@ function instalar() {
 function migrar() {
   const c = CacheService.getScriptCache();
   if (c.get('esquema') === String(VERSION)) return;
+  // Si entran muchos a la vez justo después de actualizar, solo uno revisa las hojas
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error(OCUPADO);
+  try {
+    if (c.get('esquema') === String(VERSION)) return;
+    migrarHojas();
+  } finally { lock.releaseLock(); }
+}
+
+function migrarHojas() {
+  const c = CacheService.getScriptCache();
   Object.keys(HOJAS).forEach(n => {
     let sh = hoja(n);
     const enc = HOJAS[n];
@@ -320,14 +332,20 @@ function actualizar(n, numFila, obj) {
   });
 }
 
+// Config se lee una vez por petición
+let _cfg = null;
 function cfg(k) {
-  const sh = hoja('Config');
-  if (!sh) return '';
-  const r = sh.getDataRange().getValues().find(x => x[0] === k);
-  return r ? String(r[1]) : '';
+  if (!_cfg) {
+    const sh = hoja('Config');
+    if (!sh) return '';
+    _cfg = {};
+    sh.getDataRange().getValues().forEach(x => { if (!(x[0] in _cfg)) _cfg[x[0]] = String(x[1]); });
+  }
+  return k in _cfg ? _cfg[k] : '';
 }
 
 function setCfg(k, v) {
+  _cfg = null;
   const f = filas('Config').find(x => x.Clave === k);
   if (f) actualizar('Config', f._fila, { Valor: v }); else agregar('Config', { Clave: k, Valor: v });
 }
@@ -345,17 +363,28 @@ function normalizarGrupo(g) {
   return m ? m[1] + '°' + m[2] : '';
 }
 
+// Mensaje que la página reconoce para reintentar sola (no se escribió nada)
+const OCUPADO = 'OCUPADO: Hay muchas personas usando la aplicación en este momento. Intenta de nuevo.';
+
+// Las escrituras van de una en una. Lo lento (fotos, correos) se hace fuera del bloqueo.
 function conBloqueo(fn) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(30000)) throw new Error(OCUPADO);
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
+// Las fotos se guardan 6 horas en caché: abrir la lista o escanear no espera a Drive
 function fotoDataUrl(fotoId) {
   if (!fotoId) return '';
+  const c = CacheService.getScriptCache();
+  const k = 'f_' + fotoId;
+  const v = c.get(k);
+  if (v) return v;
   try {
     const b = DriveApp.getFileById(fotoId).getBlob();
-    return 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes());
+    const url = 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes());
+    if (url.length < 95000) try { c.put(k, url, 21600); } catch (e) {}
+    return url;
   } catch (e) { return ''; }
 }
 
@@ -366,7 +395,11 @@ function guardarFoto(dataUrl, nombre) {
   return DriveApp.getFolderById(cfg('carpeta_fotos')).createFile(blob).getId();
 }
 
-function borrarFoto(id) { if (id) try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} }
+function borrarFoto(id) {
+  if (!id) return;
+  try { CacheService.getScriptCache().remove('f_' + id); } catch (e) {}
+  try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {}
+}
 
 function mayorActivo(familiaId, alumnos) {
   return alumnos.filter(a => a.FamiliaID === familiaId && a.Activo !== 'NO')
@@ -546,10 +579,14 @@ function agregarPersona(token, p) {
   if (!famId) throw new Error('Falta la familia.');
   if (!nombre) throw new Error('Escribe el nombre completo.');
   if (!p.foto) throw new Error('Agrega una foto del rostro para que el maestro la reconozca.');
-  return conBloqueo(() => {
-    agregar('Personas', { ID: nuevoId(), FamiliaID: famId, Nombre: nombre, Parentesco: txt(p.parentesco), FotoID: guardarFoto(p.foto, nombre) });
-    return true;
-  });
+  const foto = guardarFoto(p.foto, nombre);  // fuera del bloqueo: es lo más lento
+  if (!foto) throw new Error('La foto no es válida. Tómala otra vez.');
+  try {
+    return conBloqueo(() => {
+      agregar('Personas', { ID: nuevoId(), FamiliaID: famId, Nombre: nombre, Parentesco: txt(p.parentesco), FotoID: foto });
+      return true;
+    });
+  } catch (e) { borrarFoto(foto); throw e; }
 }
 
 function quitarPersona(token, personaId) {
@@ -664,11 +701,22 @@ function entregarTransporte(token, ids) {
 }
 
 function registrarVarios(s, ids, personaId, extra) {
+  // Persona no autorizada: se valida y se guarda su foto ANTES del bloqueo (Drive es lento)
+  extra._otra = !extra.transporte && extra.otra ? validarOtra(extra.otra) : null;
+  if (extra._otra) {
+    extra._otra.fotoId = guardarFoto(extra._otra.foto, 'No autorizado ' + hoy() + ' ' + extra._otra.nombre);
+    if (!extra._otra.fotoId) throw new Error('No se pudo guardar la foto. Tómala otra vez.');
+  }
+  try { return registrarVariosBloqueado(s, ids, personaId, extra); }
+  catch (e) { if (extra._otra) borrarFoto(extra._otra.fotoId); throw e; }
+}
+
+function registrarVariosBloqueado(s, ids, personaId, extra) {
   return conBloqueo(() => {
     const alumnos = filas('Alumnos'), maestros = filas('Maestros'), permisos = permisosActivos(), asis = asistenciaHoy();
     const yo = maestroDeSesion(s, maestros);
     const salHoy = filas('Salidas').filter(x => x.Fecha === hoy());
-    const otra = !extra.transporte && extra.otra ? validarOtra(extra.otra) : null;
+    const otra = extra._otra || null;
     const persona = extra.transporte || otra ? null : filas('Personas').find(x => x.ID === personaId);
     if (!extra.transporte && !otra && !persona) throw new Error('Toca la foto de quien recoge al alumno.');
     const hora = ahora(), temprana = hora < horaSalida(), motivo = txt(extra.motivo);
@@ -692,11 +740,7 @@ function registrarVarios(s, ids, personaId, extra) {
       if (persona.FamiliaID !== a.FamiliaID) throw new Error(persona.Nombre + ' no está autorizado(a) para ' + nombreCorto(a) + '.');
       return Object.assign(r, { Tipo: temprana ? 'Temprana' : 'Normal', Recogio: persona.Nombre, Parentesco: persona.Parentesco, FotoID: persona.FotoID });
     });
-    if (otra) {  // la foto se guarda una sola vez, ya validado todo
-      const foto = guardarFoto(otra.foto, 'No autorizado ' + hoy() + ' ' + otra.nombre);
-      if (!foto) throw new Error('No se pudo guardar la foto. Tómala otra vez.');
-      regs.forEach(r => { r.FotoID = foto; });
-    }
+    if (otra) regs.forEach(r => { r.FotoID = otra.fotoId; });
     regs.forEach(r => agregar('Salidas', r));  // primero se valida todo, luego se escribe
     return regs;
   });
@@ -1109,15 +1153,19 @@ function editarAlumno(token, d) {
 
 function fotoAlumno(token, id, dataUrl) {
   sesion(token, ['dir']);
-  return conBloqueo(() => {
-    const a = filas('Alumnos').find(x => x.ID === id);
-    if (!a) throw new Error('Alumno no encontrado.');
-    const nueva = guardarFoto(dataUrl, a.Nombre);
-    if (!nueva) throw new Error('La foto no es válida.');
-    borrarFoto(a.FotoID);
-    actualizar('Alumnos', a._fila, { FotoID: nueva });
-    return true;
-  });
+  const nueva = guardarFoto(dataUrl, 'Alumno ' + id);
+  if (!nueva) throw new Error('La foto no es válida.');
+  let vieja = '';
+  try {
+    conBloqueo(() => {
+      const a = filas('Alumnos').find(x => x.ID === id);
+      if (!a) throw new Error('Alumno no encontrado.');
+      vieja = a.FotoID;
+      actualizar('Alumnos', a._fila, { FotoID: nueva });
+    });
+  } catch (e) { borrarFoto(nueva); throw e; }
+  borrarFoto(vieja);
+  return true;
 }
 
 function editarFamilia(token, d) {

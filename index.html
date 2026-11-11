@@ -294,13 +294,30 @@ const qrUrl=c=>location.origin+location.pathname+'?qr='+encodeURIComponent(c);
 const pillTipo=t=>t==='Temprana'?'<span class="pill warn">Temprana</span>':t==='Transporte'?`<span class="pill">${I.bus}Transporte</span>`:t==='No autorizado'?'<span class="pill bad">No autorizado</span>':'';
 const textoSalida=s=>s.tipo==='Transporte'?`Subió al ${esc(s.recogio).replace('Transporte','transporte')}`:`Con ${esc(s.recogio)}${s.parentesco?' ('+esc(s.parentesco)+')':''}`;
 
+// Solo lectura: se pueden repetir sin riesgo si se corta el internet
+const LECTURAS=new Set(['version','entrar','datosPadre','datosMaestro','abrirAlumno','buscarQR','resumenDir','listaGrupo','buscarAlumnos','fichaAlumno','listaMaestros','transporteDir','listaPermisos','reporte','sinAcuerdo','estadisticas']);
+const esperar=ms=>new Promise(r=>setTimeout(r,ms));
+// Reintenta sola cuando hay mucha gente conectada (Google responde "ocupado" o con una página de error)
 async function api(fn,...args){
   if(!/^https:\/\/script\.google\.com\//.test(API_URL))throw new Error('Falta configurar API_URL en index.html.');
-  let r;
-  try{r=await fetch(API_URL,{method:'POST',body:JSON.stringify({fn,args})})}
-  catch(e){throw new Error('Sin conexión. Revisa tu internet e intenta de nuevo.')}
-  let j;try{j=await r.json()}catch(e){throw new Error('El servidor no respondió bien. Intenta de nuevo.')}
-  return respuesta(j);
+  const intentos=4;
+  for(let i=1;;i++){
+    let r,j,reintentable=false,error;
+    const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),60000);
+    try{r=await fetch(API_URL,{method:'POST',body:JSON.stringify({fn,args}),signal:ctl.signal})}
+    catch(e){error=ctl.signal.aborted?'El servidor tardó demasiado. Intenta de nuevo.':'Sin conexión. Revisa tu internet e intenta de nuevo.';reintentable=LECTURAS.has(fn)}
+    finally{clearTimeout(t)}
+    if(r){
+      try{j=await r.json()}catch(e){j=null}
+      if(j&&j.ok)return j.data;
+      if(j&&!/^OCUPADO/.test(j.error||''))return respuesta(j);
+      // Ocupado o error de Google antes de ejecutar: no se escribió nada, se puede repetir
+      error='Hay muchas personas usando la aplicación. Intenta de nuevo en un momento.';reintentable=true;
+    }
+    if(!reintentable||i>=intentos)throw new Error(error);
+    if(i===2)toast('Mucha gente conectada… seguimos intentando.');
+    await esperar(1200*i+Math.random()*1500);
+  }
 }
 function respuesta(j){
   if(!j.ok){
@@ -1097,6 +1114,7 @@ document.addEventListener('change',async e=>{
 
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target,btn=f.querySelector('button[type=submit]');
+  if(btn&&btn.disabled)return;  // evita doble envío
   if(f.id==='f-scan'){const v=val('qrin');await cerrarCamara(true);buscar(v);return}
   if(f.id==='f-scan2'){buscar(val('qrin2'));return}
   await hacer(btn,async()=>{
