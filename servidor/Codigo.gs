@@ -11,6 +11,7 @@ const TZ = 'America/Monterrey';
 const VERSION = 6;
 const TIPOS_MAESTRO = ['Titular', 'Jornada ampliada'];
 const HORA_SALIDA_DEFAULT = '14:30';
+const CLAVE_INICIAL_MAESTRO = 'maestro2026';  // cada maestro la cambia en la app
 const DIAS_SESION = 30;
 // Las columnas nuevas siempre van al final: así las hojas existentes se actualizan solas.
 const HOJAS = {
@@ -46,7 +47,7 @@ const API = {
   datosMaestro, darPermiso, quitarPermiso, listaPermisos,
   resumenDir, sinAcuerdo, estadisticas, listaGrupo, buscarAlumnos, fichaAlumno, altaAlumno, editarAlumno, fotoAlumno,
   editarFamilia, restablecerPin, listaMaestros, guardarMaestro, transporteDir, guardarConfig, vincularHermano, separarFamilia, borrarDatosDir,
-  importarFilas, reporte, exportarExcel, cerrarCicloDir, cambiarClaveDir
+  importarFilas, reporte, exportarExcel, cerrarCicloDir, cambiarClaveDir, cambiarClaveMaestro
 };
 
 function version() { return { version: VERSION }; }
@@ -887,7 +888,7 @@ function datosMaestro(token) {
     });
   }));
   return {
-    yo: { nombre: yo.Nombre, grupo: yo.Grupo, tipo: tipoMaestro(yo) }, horaSalida: horaSalida(), temprana: ahora() < horaSalida(),
+    yo: { nombre: yo.Nombre, grupo: yo.Grupo, tipo: tipoMaestro(yo), claveInicial: yo.Contrasena === CLAVE_INICIAL_MAESTRO }, horaSalida: horaSalida(), temprana: ahora() < horaSalida(),
     grupo: mios.map(item), extras, hermanos, rutas: rutasEscuela(alumnos),
     listaPasada: mios.some(a => asis[a.ID]),
     alumnosGrupo: mios.map(a => ({ id: a.ID, nombre: a.Nombre })),
@@ -1276,7 +1277,7 @@ function guardarMaestro(token, d) {
     const tipo = d.tipo === 'Jornada ampliada' ? 'Jornada ampliada' : 'Titular';
     const otro = maestros.find(x => x.ID !== d.id && x.Grupo === grupo && tipoMaestro(x) === tipo);
     if (otro) throw new Error(grupo + ' ya tiene maestro ' + (tipo === 'Titular' ? 'titular' : 'de jornada ampliada') + ': ' + otro.Nombre + '.');
-    const clave = txt(d.contrasena) || (m ? m.Contrasena : String(Math.floor(100000 + Math.random() * 900000)));
+    const clave = txt(d.contrasena) || (m ? m.Contrasena : CLAVE_INICIAL_MAESTRO);
     const datos = { Nombre: nombre, Grupo: grupo, Usuario: usuario, Contrasena: clave, Correo: validarCorreo(txt(d.correo)), Tipo: tipo };
     if (m) actualizar('Maestros', m._fila, datos); else agregar('Maestros', Object.assign({ ID: nuevoId() }, datos));
     return { contrasena: clave };
@@ -1426,6 +1427,21 @@ function cerrarCicloDir(token, confirmacion) {
   sesion(token, ['dir']);
   if (txt(confirmacion).toUpperCase() !== 'CERRAR') throw new Error('Escribe CERRAR para confirmar.');
   return cerrarCiclo();
+}
+
+// Cada maestro cambia su propia contraseña
+function cambiarClaveMaestro(token, actual, nueva) {
+  const s = sesion(token, ['maestro']);
+  nueva = txt(nueva);
+  if (nueva.length < 6) throw new Error('La nueva contraseña debe tener al menos 6 caracteres.');
+  if (nueva === CLAVE_INICIAL_MAESTRO) throw new Error('Elige una contraseña distinta a la inicial.');
+  return conBloqueo(() => {
+    const m = maestroDeSesion(s, filas('Maestros'));
+    if (!m) throw new Error('Maestro no encontrado.');
+    if (txt(actual) !== m.Contrasena) throw new Error('La contraseña actual no es correcta.');
+    actualizar('Maestros', m._fila, { Contrasena: nueva });
+    return true;
+  });
 }
 
 function cambiarClaveDir(token, actual, nueva) {

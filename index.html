@@ -488,6 +488,7 @@ maestro_salidas(){
   let h=`<button class="btn pri xl full" data-a="camara">${I.scan} Escanear código QR</button>
   <p class="muted" style="text-align:center"><span class="paso">1</span>Escanea <span class="paso">2</span>Toca la foto <span class="paso">3</span>Registrar salida</p>
   <div class="stats" ${trans.length?'':'style="grid-template-columns:repeat(2,1fr)"'}><div class="stat"><b>${dentro.length}</b><span>En la escuela</span></div><div class="stat"><b>${fuera.length}</b><span>Ya salieron</span></div>${trans.length?`<div class="stat"><b>${trans.length-transPend.length}/${trans.length}</b><span>Transporte</span></div>`:''}</div>`;
+  if(d.yo.claveInicial)h+=`<div class="aviso">${I.key}<div class="grow"><b>Cambia tu contraseña</b><p class="muted">Todavía usas la inicial (maestro2026).</p></div><button class="btn sm pri" data-a="clave">Cambiar</button></div>`;
   if(!d.listaPasada&&d.temprana)h+=`<div class="aviso">${I.list}<div class="grow"><b>Pasa lista antes de la salida</b><p class="muted">Marca quién faltó y quién se va en transporte hoy.</p></div><button class="btn sm pri" data-tab="asistencia">Lista</button></div>`;
   if(faltas.length)h+=`<p class="muted">Faltaron hoy: <b>${esc(faltas.map(a=>nom1(a.nombre)).join(', '))}</b> · no aparecen para entregar.</p>`;
   if(d.temprana)h+=`<p class="nota">Antes de las <b>${esc(d.horaSalida)}</b> la salida cuenta como <b>temprana</b> y se pide el motivo.</p>`;
@@ -542,7 +543,8 @@ maestro_hoy(){
   const d=D.maestro;if(!d)return cargando;
   const rows=hoyFiltro==='mio'?d.salidas.filter(s=>s.grupo===d.yo.grupo||s.entrego===d.yo.nombre):d.salidas;
   return `<div class="chips">${[['mio','Mi grupo'],['todos','Toda la escuela']].map(([k,l])=>`<button aria-pressed="${hoyFiltro===k}" data-a="hoyfiltro" data-val="${k}">${l}</button>`).join('')}</div>
-  <section class="card">${listaSalidas(rows,'Todavía no hay salidas hoy.')}</section>`;
+  <section class="card">${listaSalidas(rows,'Todavía no hay salidas hoy.')}</section>
+  <button class="btn full" data-a="clave">${I.key} Cambiar mi contraseña</button>`;
 },
 /* ===== DIRECCIÓN ===== */
 dir_inicio(){
@@ -783,7 +785,7 @@ maestro(s){
   <label class="f" for="mg">Grupo<select id="mg">${GRUPOS.map(g=>{const o=ocup(g);return `<option value="${g}" ${m&&m.grupo===g?'selected':''} ${o.length>=2?'disabled':''}>${g}${o.length?' (ya tiene '+o.join(' y ')+')':''}</option>`}).join('')}</select></label>
   <label class="f" for="mt">Tipo<select id="mt">${['Titular','Jornada ampliada'].map(t=>`<option ${m&&m.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
   <label class="f" for="mu">Usuario<input id="mu" required autocapitalize="none" spellcheck="false" value="${esc(m?m.usuario:'')}"></label>
-  <label class="f" for="mc">Contraseña<input id="mc" value="${esc(m?m.contrasena:'')}" placeholder="Déjala vacía para generar una"></label>
+  <label class="f" for="mc">Contraseña<input id="mc" value="${esc(m?m.contrasena:'')}" placeholder="Vacía = maestro2026 (el maestro la cambia después)"></label>
   <label class="f" for="me">Correo<input id="me" type="email" inputmode="email" value="${esc(m?m.correo:'')}"></label>
   <button class="btn pri big full" type="submit">Guardar</button></form>
   ${m?botonConfirmar('delm','Eliminar maestro','delmaestro',`data-id="${m.id}"`,esc(m.nombre)+' ya no podrá entrar.','btn warn full'):''}`;
@@ -869,7 +871,7 @@ estadisticas(){
   return h+`<p class="muted">Acuerdos firmados: <b>${e.acuerdos.firmados} de ${e.acuerdos.total}</b> familias. La asistencia se calcula con el pase de lista de los días con registro.${e.excluidos?` No se incluyen ${e.excluidos} alumnos cuyas familias no aceptaron el uso estadístico.`:''} Todos los datos son agrupados: no identifican a ningún alumno.</p>`;
 },
 clave(){
-  return `<h1>Contraseña de dirección</h1><form class="card form" id="f-clave">
+  return `<h1>${ses.rol==='maestro'?'Mi contraseña':'Contraseña de dirección'}</h1>${ses.rol==='maestro'&&D.maestro&&D.maestro.yo.claveInicial?'<p class="nota">Tu contraseña actual es la inicial: <b>maestro2026</b>. Elige una nueva que solo tú conozcas.</p>':''}<form class="card form" id="f-clave">
   <label class="f" for="ka">Contraseña actual<input id="ka" type="password" autocomplete="current-password"></label>
   <label class="f" for="kn">Nueva contraseña (mínimo 6)<input id="kn" type="password" autocomplete="new-password"></label>
   <button class="btn pri big full" type="submit">Cambiar</button></form>`;
@@ -1136,7 +1138,7 @@ document.addEventListener('submit',async e=>{
         toast('Guardado. Contraseña: '+r.contrasena);D.maestros=await api('listaMaestros',tok());atras();break}
       case 'f-est':D.estF={desde:val('ed'),hasta:val('eh')};D.est=null;render();D.est=await api('estadisticas',tok(),D.estF);render();break;
       case 'f-reporte':D.filtro=filtroRep();D.reporte=await api('reporte',tok(),D.filtro);render();break;
-      case 'f-clave':await api('cambiarClaveDir',tok(),val('ka'),val('kn'));toast('Contraseña cambiada.');atras();break;
+      case 'f-clave':await api(ses.rol==='maestro'?'cambiarClaveMaestro':'cambiarClaveDir',tok(),val('ka'),val('kn'));toast('Contraseña cambiada.');if(ses.rol==='maestro'&&D.maestro)D.maestro.yo.claveInicial=false;atras();break;
       case 'f-ciclo':{const r=await api('cerrarCicloDir',tok(),val('cic'));toast(`Ciclo cerrado: ${r.subieron} subieron de grado, ${r.egresaron} egresaron.`);atras();break}
     }
   });
