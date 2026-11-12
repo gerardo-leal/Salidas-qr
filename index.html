@@ -591,7 +591,7 @@ dir_mas(){
   ${item('ciclo','Cerrar ciclo escolar','Sube a todos de grado y archiva el historial')}
   </div></section>
   <a class="btn full" href="acuerdo-padres.pdf" target="_blank" rel="noopener">Acuerdo para padres (PDF para imprimir y firmar)</a>
-  ${D.resumen?`<p class="muted">Último respaldo de la base de datos: <b>${esc(D.resumen.ultimoRespaldo||'todavía no hay')}</b>${D.resumen.ultimoRespaldo?'':' · se activa desde la hoja: menú Salidas QR → Activar respaldo semanal'}.</p>`:''}
+  ${D.resumen?`<p class="muted">Último respaldo de la base de datos: <b>${esc(D.resumen.ultimoRespaldo||'todavía no hay')}</b>${D.resumen.ultimoRespaldo?'':''} · se hace solo cada semana, al abrir Inicio.</p>`:''}
   ${D.resumen&&D.resumen.hojaUrl?`<a class="btn full" href="${esc(D.resumen.hojaUrl)}" target="_blank" rel="noopener">Abrir base de datos en Drive</a>`:''}`;
 }
 };

@@ -71,7 +71,7 @@ Las hojas existentes se actualizan solas (se agregan columnas nuevas al final); 
 - **WhatsApp:** botón para avisar a la familia con el mensaje ya escrito (salida, falta o alumno sin recoger). Es gratis: abre WhatsApp en el teléfono de quien lo toca.
 - **Acuerdo firmado:** `acuerdo-padres.pdf` para imprimir. En la ficha (Familia) o en Más → Acuerdos firmados se marca quién lo entregó y si aceptó el uso estadístico.
 - **Estadísticas (Más → Estadísticas):** asistencia por grupo, tipos de salida, motivos de salida temprana y horas de recogida. Solo números agrupados y sin las familias que no aceptaron el uso estadístico.
-- **Respaldo semanal:** en la hoja, menú Salidas QR → Activar respaldo semanal (una vez). Guarda una copia cada domingo en la carpeta «Salidas QR - Respaldos» y conserva las últimas 8.
+- **Respaldo semanal:** automático. Cuando la dirección abre Inicio y pasaron 7 días o más, se guarda una copia de la hoja en la carpeta «Salidas QR - Respaldos» (se conservan las últimas 8). También se puede hacer a mano desde la hoja: menú Salidas QR → Hacer un respaldo ahora.
 - **Deshacer:** si se registró por error, se anula y la familia recibe un correo de corrección.
 - **Ayuda para todos:** la primera vez que alguien entra ve una guía corta; el botón **Ayuda** tiene los pasos, preguntas frecuentes y un video: `videos/padres.mp4` y `videos/maestros.mp4` (se pueden mandar por WhatsApp).
 - **Sesión:** queda abierta 30 días en cada teléfono. «Borrar todos los datos» cierra todas las sesiones.

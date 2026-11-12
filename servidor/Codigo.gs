@@ -141,7 +141,6 @@ function onOpen() {
     .addItem('Cargar datos de prueba', 'cargarDatosDePrueba')
     .addItem('Borrar todos los datos', 'borrarTodo')
     .addSeparator()
-    .addItem('Activar respaldo semanal', 'activarRespaldo')
     .addItem('Hacer un respaldo ahora', 'respaldar')
     .addToUi();
 }
@@ -161,16 +160,16 @@ function respaldar() {
   while (it.hasNext()) lista.push(it.next());
   lista.sort((a, b) => b.getDateCreated() - a.getDateCreated()).slice(RESPALDOS_GUARDADOS).forEach(f => f.setTrashed(true));
   setCfg('ultimo_respaldo', hoy() + ' ' + ahora());
-  avisar('Respaldo guardado en Drive: ' + copia.getName());
+  try { avisar('Respaldo guardado en Drive: ' + copia.getName()); } catch (e) {}
   return copia.getName();
 }
 
-// Programa un respaldo cada domingo a las 11 p. m. (se corre una vez desde el menú)
-function activarRespaldo() {
-  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'respaldar').forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('respaldar').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(23).create();
-  respaldar();
-  avisar('Respaldo semanal activado: cada domingo en la noche. Ya se hizo el primero.');
+// Respaldo automático semanal sin permisos extra: lo dispara la dirección al abrir Inicio
+// si pasaron 7 días o más desde el último. Si falla, no afecta a la aplicación.
+function respaldoSiToca() {
+  const u = cfg('ultimo_respaldo').slice(0, 10);
+  if (u && (new Date(hoy()) - new Date(u)) / 864e5 < 7) return;
+  try { respaldar(); } catch (e) { console.error('Respaldo: ' + e); }
 }
 
 /* ================= DATOS DE PRUEBA ================= */
@@ -972,6 +971,7 @@ function listaPermisos(token) {
 
 function resumenDir(token) {
   sesion(token, ['dir']);
+  respaldoSiToca();
   const alumnos = filas('Alumnos').filter(a => a.Activo !== 'NO');
   const maestros = filas('Maestros');
   const salidasHoy = filas('Salidas').filter(x => x.Fecha === hoy());
